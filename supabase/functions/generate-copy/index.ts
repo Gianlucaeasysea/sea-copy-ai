@@ -17,8 +17,6 @@ const FRAMEWORK_TEMPLATES: Record<string, string> = {
   "Plain Broadcast": "Structure: Direct, conversational announcement. No heavy framework. Just inform clearly and link.",
 };
 
-// Converts Claude's SSE stream format to OpenAI-compatible SSE format
-// so the frontend parser does not need to change.
 function claudeStreamToOpenAI(claudeStream: ReadableStream): ReadableStream {
   const reader = claudeStream.getReader();
   const decoder = new TextDecoder();
@@ -77,7 +75,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Load campaign
     const { data: campaign } = await supabase
       .from("campaigns")
       .select("*")
@@ -85,38 +82,58 @@ serve(async (req) => {
       .single();
     if (!campaign) throw new Error("Campaign not found");
 
-    // Load brand settings
     const { data: settingsRows } = await supabase.from("brand_settings").select("*");
     const settings: Record<string, string> = {};
     settingsRows?.forEach((r: any) => { settings[r.key] = r.value; });
 
-    // Load active corrections filtered by language
     const { data: corrections } = await supabase
       .from("corrections")
       .select("*")
       .eq("is_active", true)
       .or(`language.eq.${campaign.language},language.eq.all`);
 
-    // Build correction style rules to inject in system prompt
     let correctionRules = "";
     if (corrections && corrections.length > 0) {
       correctionRules =
         "\n\nSTYLE RULES FROM PAST CORRECTIONS:\n" +
         corrections
-          .map(
-            (c: any) =>
-              `- Do NOT write "${c.original_text}". Instead write "${c.corrected_text}". (${c.category})`
-          )
+          .map((c: any) => `- Do NOT write "${c.original_text}". Instead write "${c.corrected_text}". (${c.category})`)
           .join("\n");
     }
+
+    // Load brand voice analysis from Klaviyo (if available)
+    const { data: voiceAnalysis } = await supabase
+      .from("brand_voice_analysis")
+      .select("analysis_document, subject_examples, opener_examples, cta_examples, campaigns_analyzed, date_range_start, date_range_end")
+      .eq("is_active", true)
+      .order("analyzed_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    const brandVoiceBlock = voiceAnalysis
+      ? `BRAND VOICE STYLE GUIDE
+Extracted from ${voiceAnalysis.campaigns_analyzed} real easysea® campaigns (${voiceAnalysis.date_range_start} → ${voiceAnalysis.date_range_end}).
+This is the authoritative source of truth for tone, style, and voice. Follow it exactly.
+
+${voiceAnalysis.analysis_document}
+
+---
+REAL SUBJECT LINE EXAMPLES — use as style reference (do not copy verbatim):
+${(voiceAnalysis.subject_examples as string[] || []).slice(0, 15).map((s: string, i: number) => `${i + 1}. ${s}`).join("\n")}
+
+REAL OPENING LINE EXAMPLES:
+${(voiceAnalysis.opener_examples as string[] || []).slice(0, 8).map((s: string, i: number) => `${i + 1}. ${s}`).join("\n")}
+
+REAL CTA EXAMPLES:
+${(voiceAnalysis.cta_examples as string[] || []).slice(0, 10).map((s: string, i: number) => `${i + 1}. ${s}`).join("\n")}`
+      : `BRAND VOICE: ${settings.brand_voice || "Energetic, direct, technical but accessible. No fluff. Sailors talk to sailors. Short sentences."}`;
 
     const frameworkGuide =
       FRAMEWORK_TEMPLATES[campaign.framework] || FRAMEWORK_TEMPLATES["Plain Broadcast"];
 
     const systemPrompt = `You are an expert email marketing copywriter for easysea®, an Italian sailing gear brand.
 
-BRAND VOICE: ${settings.brand_voice || "Energetic, direct, technical but accessible. No fluff. Sailors talk to sailors. Short sentences."}
-PERSONA FALLBACK: ${settings.persona_fallback || "Sea Lover"}
+${brandVoiceBlock}
 ${correctionRules}
 
 EMAIL FRAMEWORK: ${campaign.framework}
@@ -183,11 +200,7 @@ Generate the email and WhatsApp copy now.`;
 
       const normalized = claudeStreamToOpenAI(response.body!);
       return new Response(normalized, {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/event-stream",
-          "X-Model-Used": "claude",
-        },
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Model-Used": "claude" },
       });
     }
 
@@ -224,21 +237,15 @@ Generate the email and WhatsApp copy now.`;
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const t = await response.text();
-      console.error("Gemini gateway error:", response.status, t);
       return new Response(JSON.stringify({ error: "AI generation failed" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     return new Response(response.body, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/event-stream",
-        "X-Model-Used": "gemini",
-      },
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Model-Used": "gemini" },
     });
+
   } catch (e) {
     console.error("generate-copy error:", e);
     return new Response(

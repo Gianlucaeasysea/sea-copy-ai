@@ -35,6 +35,48 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_voice_analysis: {
+        Row: {
+          analysis_document: string
+          analyzed_at: string | null
+          campaigns_analyzed: number
+          cta_examples: Json | null
+          date_range_end: string | null
+          date_range_start: string | null
+          id: string
+          is_active: boolean | null
+          opener_examples: Json | null
+          subject_examples: Json | null
+          vocabulary_bank: Json | null
+        }
+        Insert: {
+          analysis_document: string
+          analyzed_at?: string | null
+          campaigns_analyzed?: number
+          cta_examples?: Json | null
+          date_range_end?: string | null
+          date_range_start?: string | null
+          id?: string
+          is_active?: boolean | null
+          opener_examples?: Json | null
+          subject_examples?: Json | null
+          vocabulary_bank?: Json | null
+        }
+        Update: {
+          analysis_document?: string
+          analyzed_at?: string | null
+          campaigns_analyzed?: number
+          cta_examples?: Json | null
+          date_range_end?: string | null
+          date_range_start?: string | null
+          id?: string
+          is_active?: boolean | null
+          opener_examples?: Json | null
+          subject_examples?: Json | null
+          vocabulary_bank?: Json | null
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
           body_markdown: string | null
