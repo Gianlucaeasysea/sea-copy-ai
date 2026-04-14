@@ -48,7 +48,10 @@ serve(async (req) => {
     const settings: Record<string, string> = {};
     settingsRows?.forEach((r: any) => { settings[r.key] = r.value; });
 
-    const storeUrl = settings.shopify_store_url?.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    let storeUrl = settings.shopify_store_url?.replace(/^https?:\/\//, "").replace(/\/$/, "") || "";
+    const adminMatch = storeUrl.match(/admin\.shopify\.com\/store\/([^\/]+)/);
+    if (adminMatch) storeUrl = `${adminMatch[1]}.myshopify.com`;
+    if (storeUrl && !storeUrl.includes(".")) storeUrl = `${storeUrl}.myshopify.com`;
     const token = settings.shopify_admin_token;
     if (!storeUrl || !token) throw new Error("Shopify credentials not configured");
 
@@ -60,7 +63,10 @@ serve(async (req) => {
       fetch(`${base}/products/${product_id}/metafields.json?limit=250`, { headers }),
     ]);
 
-    if (!productRes.ok) throw new Error(`Shopify product fetch failed: ${productRes.status}`);
+    if (!productRes.ok) {
+      const errorBody = await productRes.text();
+      throw new Error(`Shopify product fetch failed: ${productRes.status} - ${errorBody.slice(0, 200)}`);
+    }
 
     const productJson = await productRes.json();
     const p = productJson.product;
