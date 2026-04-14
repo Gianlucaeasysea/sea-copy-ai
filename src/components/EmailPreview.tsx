@@ -25,7 +25,7 @@ function renderMarkdown(md: string): string {
     .replace(/~~(.*?)~~/g, '<s style="color:#999">$1</s>')
     .replace(/^#{1,2} (.+)$/gm, '<h2 style="font-size:22px;font-weight:700;margin:20px 0 8px;color:#0A1628">$1</h2>')
     .replace(/^#{3,6} (.+)$/gm, '<h3 style="font-size:16px;font-weight:600;margin:16px 0 6px;color:#0A1628">$1</h3>')
-    .replace(/^- (.+)$/gm, '<li style="margin:4px 0">$1</li>')
+    .replace(/^[-*] (.+)$/gm, '<li style="margin:4px 0">$1</li>')
     .replace(/(<li[^>]*>.*<\/li>)/gs, '<ul style="padding-left:20px;margin:12px 0">$1</ul>')
     .replace(/→ (.+)/g, '<a href="#" style="display:inline-block;background:#0A1628;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;margin:8px 0">→ $1</a>')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" style="color:#00C9B1;text-decoration:underline">$1</a>')
