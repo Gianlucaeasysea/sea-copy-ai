@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { PlusCircle, Mail, MessageSquare, Filter } from "lucide-react";
+import { PlusCircle, Mail, MessageSquare, Filter, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -23,16 +24,25 @@ export default function Dashboard() {
   const [filterLang, setFilterLang] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
 
-  useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase
-        .from("campaigns")
-        .select("*")
-        .order("created_at", { ascending: false });
-      setCampaigns(data || []);
-    };
+  const load = async () => {
+    const { data } = await supabase
+      .from("campaigns")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setCampaigns(data || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const deleteCampaign = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Eliminare questa campagna?")) return;
+    const { error } = await supabase.from("campaigns").delete().eq("id", id);
+    if (error) { toast.error("Errore: " + error.message); return; }
+    toast.success("Campagna eliminata");
     load();
-  }, []);
+  };
 
   const filtered = campaigns.filter((c) => {
     if (filterType !== "All" && c.type !== filterType) return false;
@@ -90,11 +100,20 @@ export default function Dashboard() {
             <Link key={c.id} to={`/campaign/${c.id}`}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="p-5 space-y-3">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <h3 className="font-semibold text-sm leading-tight line-clamp-2">{c.name}</h3>
-                    <Badge className={statusColors[c.status] || ""} variant="secondary">
-                      {c.status}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge className={statusColors[c.status] || ""} variant="secondary">
+                        {c.status}
+                      </Badge>
+                      <button
+                        onClick={(e) => deleteCampaign(c.id, e)}
+                        className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Elimina campagna"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="bg-secondary px-2 py-0.5 rounded">{c.type}</span>
