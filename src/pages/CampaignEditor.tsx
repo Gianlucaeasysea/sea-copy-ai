@@ -119,6 +119,11 @@ export default function CampaignEditor() {
           setActiveEmailIndex(0);
         }
 
+        // Restore products from campaign
+        if (data.products_data && Array.isArray(data.products_data)) {
+          setEditorProducts(data.products_data as any);
+        }
+
         // Auto-generate if campaign has no body yet
         if (!data.body_markdown) {
           needsAutoGenerate.current = true;
