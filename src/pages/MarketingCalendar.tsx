@@ -13,7 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
-  ChevronLeft, ChevronRight, Plus, Upload, Check, X, Pencil, Trash2, Link2,
+  ChevronLeft, ChevronRight, Plus, Upload, Check, X, Pencil, Trash2, Link2, ExternalLink, Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -82,6 +82,11 @@ export default function MarketingCalendar() {
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Notion import
+  const [notionUrl, setNotionUrl] = useState("");
+  const [notionLoading, setNotionLoading] = useState(false);
+  const [notionPreview, setNotionPreview] = useState<any[] | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -216,6 +221,44 @@ export default function MarketingCalendar() {
     load();
   };
 
+  // Notion import
+  const fetchNotion = async () => {
+    if (!notionUrl.trim()) return;
+    setNotionLoading(true);
+    setNotionPreview(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("import-notion-events", {
+        body: { notion_url: notionUrl.trim() },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const events = data?.events || [];
+      if (!events.length) { toast.error("Nessun evento trovato nella pagina"); return; }
+      setNotionPreview(events);
+    } catch (err: any) {
+      toast.error("Errore: " + (err.message || "Import fallito"));
+    } finally {
+      setNotionLoading(false);
+    }
+  };
+
+  const confirmNotionImport = async () => {
+    if (!notionPreview?.length) return;
+    const rows = notionPreview.map((e: any) => ({
+      name: e.name,
+      event_date: e.event_date,
+      event_type: e.event_type || "other",
+      notes: e.notes || null,
+    }));
+    const { error } = await supabase.from("marketing_events").insert(rows as any);
+    if (error) { toast.error("Insert failed"); return; }
+    toast.success(`${rows.length} eventi importati da Notion`);
+    setShowImport(false);
+    setNotionUrl("");
+    setNotionPreview(null);
+    load();
+  };
+
   // Calendar grid
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfWeek(viewYear, viewMonth);
@@ -238,7 +281,7 @@ export default function MarketingCalendar() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
-            <Upload className="mr-1 h-3 w-3" /> Importa CSV
+            <Upload className="mr-1 h-3 w-3" /> Importa
           </Button>
           <Button size="sm" onClick={() => openAdd()}>
             <Plus className="mr-1 h-3 w-3" /> Nuovo Evento
@@ -411,18 +454,61 @@ export default function MarketingCalendar() {
         </DialogContent>
       </Dialog>
 
-      {/* CSV Import Dialog */}
-      <Dialog open={showImport} onOpenChange={setShowImport}>
+      {/* Import Dialog (CSV + Notion) */}
+      <Dialog open={showImport} onOpenChange={(open) => { setShowImport(open); if (!open) { setCsvText(""); setNotionUrl(""); setNotionPreview(null); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Importa Eventi da CSV</DialogTitle>
+            <DialogTitle>Importa Eventi</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Il CSV deve avere colonne <strong>nome</strong> (o name) e <strong>data</strong> (o date, formato YYYY-MM-DD). 
-              Colonne opzionali: <strong>tipo</strong> (type), <strong>note</strong> (notes).
-            </p>
-            <div>
+          <div className="space-y-5">
+            {/* Notion section */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Da link Notion</Label>
+              <p className="text-xs text-muted-foreground">
+                Incolla il link di una pagina Notion pubblica con le date degli eventi. L'AI estrarrà automaticamente nomi e date.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={notionUrl}
+                  onChange={(e) => setNotionUrl(e.target.value)}
+                  placeholder="https://notion.so/..."
+                  className="flex-1"
+                />
+                <Button onClick={fetchNotion} disabled={notionLoading || !notionUrl.trim()} size="sm">
+                  {notionLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
+                  <span className="ml-1">{notionLoading ? "Analizzo…" : "Estrai"}</span>
+                </Button>
+              </div>
+              {notionPreview && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-primary">{notionPreview.length} eventi trovati:</p>
+                  <div className="max-h-[180px] overflow-auto border rounded p-2 space-y-1">
+                    {notionPreview.map((ev: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <span className={`h-2 w-2 rounded-full shrink-0 ${TYPE_COLORS[ev.event_type] || TYPE_COLORS.other}`} />
+                        <span className="font-medium">{ev.event_date}</span>
+                        <span className="truncate">{ev.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button onClick={confirmNotionImport} size="sm" className="w-full">
+                    <Plus className="mr-1 h-3 w-3" /> Importa {notionPreview.length} eventi
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">oppure</span></div>
+            </div>
+
+            {/* CSV section */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Da file CSV</Label>
+              <p className="text-xs text-muted-foreground">
+                Colonne richieste: <strong>nome/name</strong> e <strong>data/date</strong> (YYYY-MM-DD). Opzionali: tipo, note.
+              </p>
               <input
                 ref={fileRef}
                 type="file"
@@ -430,18 +516,20 @@ export default function MarketingCalendar() {
                 onChange={handleFileUpload}
                 className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
               />
+              {csvText && (
+                <>
+                  <pre className="text-xs font-mono bg-muted p-3 rounded max-h-[150px] overflow-auto whitespace-pre-wrap">
+                    {csvText.slice(0, 1000)}{csvText.length > 1000 ? "…" : ""}
+                  </pre>
+                  <Button onClick={importCsv} size="sm" className="w-full">
+                    <Upload className="mr-1 h-3 w-3" /> Importa CSV
+                  </Button>
+                </>
+              )}
             </div>
-            {csvText && (
-              <pre className="text-xs font-mono bg-muted p-3 rounded max-h-[200px] overflow-auto whitespace-pre-wrap">
-                {csvText.slice(0, 1000)}{csvText.length > 1000 ? "…" : ""}
-              </pre>
-            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowImport(false); setCsvText(""); }}>Annulla</Button>
-            <Button onClick={importCsv} disabled={!csvText.trim()}>
-              <Upload className="mr-1 h-3 w-3" /> Importa
-            </Button>
+            <Button variant="outline" onClick={() => setShowImport(false)}>Chiudi</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
