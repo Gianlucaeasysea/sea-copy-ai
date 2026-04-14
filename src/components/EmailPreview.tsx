@@ -209,8 +209,15 @@ export default function EmailPreview({
   heroImageUrl,
   products = [],
   language,
+  branded: brandedProp,
+  onBrandedChange,
 }: EmailPreviewProps) {
-  const [branded, setBranded] = useState(false);
+  const [brandedInternal, setBrandedInternal] = useState(false);
+  const branded = brandedProp !== undefined ? brandedProp : brandedInternal;
+  const setBranded = (v: boolean) => {
+    if (onBrandedChange) onBrandedChange(v);
+    else setBrandedInternal(v);
+  };
 
   const emailHtml = bodyMarkdown
     ? branded
