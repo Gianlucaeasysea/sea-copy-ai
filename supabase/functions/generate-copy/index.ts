@@ -17,6 +17,55 @@ const FRAMEWORK_TEMPLATES: Record<string, string> = {
   "Plain Broadcast": "Structure: Direct, conversational announcement. No heavy framework. Just inform clearly and link.",
 };
 
+// Converts Claude's SSE stream format to OpenAI-compatible SSE format
+// so the frontend parser does not need to change.
+function claudeStreamToOpenAI(claudeStream: ReadableStream): ReadableStream {
+  const reader = claudeStream.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+
+  return new ReadableStream({
+    async start(controller) {
+      let buffer = "";
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6).trim();
+            if (!data || data === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              if (
+                parsed.type === "content_block_delta" &&
+                parsed.delta?.type === "text_delta" &&
+                parsed.delta.text
+              ) {
+                const chunk = { choices: [{ delta: { content: parsed.delta.text } }] };
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+              } else if (parsed.type === "message_stop") {
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              }
+            } catch {
+              // skip malformed lines
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+        controller.close();
+      }
+    },
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -24,15 +73,16 @@ serve(async (req) => {
     const { campaign_id } = await req.json();
     if (!campaign_id) throw new Error("campaign_id required");
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Load campaign
-    const { data: campaign } = await supabase.from("campaigns").select("*").eq("id", campaign_id).single();
+    const { data: campaign } = await supabase
+      .from("campaigns")
+      .select("*")
+      .eq("id", campaign_id)
+      .single();
     if (!campaign) throw new Error("Campaign not found");
 
     // Load brand settings
@@ -40,27 +90,32 @@ serve(async (req) => {
     const settings: Record<string, string> = {};
     settingsRows?.forEach((r: any) => { settings[r.key] = r.value; });
 
-    // Load active corrections
+    // Load active corrections filtered by language
     const { data: corrections } = await supabase
       .from("corrections")
       .select("*")
       .eq("is_active", true)
       .or(`language.eq.${campaign.language},language.eq.all`);
 
-    // Build correction rules
+    // Build correction style rules to inject in system prompt
     let correctionRules = "";
     if (corrections && corrections.length > 0) {
-      correctionRules = "\n\nSTYLE RULES FROM PAST CORRECTIONS:\n" +
-        corrections.map((c: any) => `- Do NOT write "${c.original_text}". Instead write "${c.corrected_text}". (${c.category})`).join("\n");
+      correctionRules =
+        "\n\nSTYLE RULES FROM PAST CORRECTIONS:\n" +
+        corrections
+          .map(
+            (c: any) =>
+              `- Do NOT write "${c.original_text}". Instead write "${c.corrected_text}". (${c.category})`
+          )
+          .join("\n");
     }
 
-    // Build framework instruction
-    const frameworkGuide = FRAMEWORK_TEMPLATES[campaign.framework] || FRAMEWORK_TEMPLATES["Plain Broadcast"];
+    const frameworkGuide =
+      FRAMEWORK_TEMPLATES[campaign.framework] || FRAMEWORK_TEMPLATES["Plain Broadcast"];
 
-    // Build system prompt
     const systemPrompt = `You are an expert email marketing copywriter for easysea®, an Italian sailing gear brand.
 
-BRAND VOICE: ${settings.brand_voice || "Energetic, direct, technical but accessible."}
+BRAND VOICE: ${settings.brand_voice || "Energetic, direct, technical but accessible. No fluff. Sailors talk to sailors. Short sentences."}
 PERSONA FALLBACK: ${settings.persona_fallback || "Sea Lover"}
 ${correctionRules}
 
@@ -69,7 +124,13 @@ ${frameworkGuide}
 
 SUBJECT LINE TONE: ${campaign.subject_tone || "curiosity"}
 
-LANGUAGE: Write in ${campaign.language === "it" ? "Italian" : campaign.language === "en" ? "English" : "both Italian and English (clearly separated)"}
+LANGUAGE: Write in ${
+      campaign.language === "it"
+        ? "Italian"
+        : campaign.language === "en"
+        ? "English"
+        : "both Italian and English (clearly separated with headings)"
+    }
 
 Generate the following sections in this exact format:
 
@@ -91,7 +152,49 @@ ${campaign.context_notes ? `Context: ${campaign.context_notes}` : ""}
 
 Generate the email and WhatsApp copy now.`;
 
-    // Call Lovable AI with streaming
+    const claudeApiKey = settings.claude_api_key;
+
+    // --- CLAUDE (if API key is set in Brand Settings) ---
+    if (claudeApiKey) {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": claudeApiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 2048,
+          stream: true,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Claude API error:", response.status, text);
+        return new Response(
+          JSON.stringify({ error: `Claude API error ${response.status}: ${text}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const normalized = claudeStreamToOpenAI(response.body!);
+      return new Response(normalized, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream",
+          "X-Model-Used": "claude",
+        },
+      });
+    }
+
+    // --- GEMINI via Lovable gateway (default fallback) ---
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -110,30 +213,37 @@ Generate the email and WhatsApp copy now.`;
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded, please try again later." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error("Gemini gateway error:", response.status, t);
       return new Response(JSON.stringify({ error: "AI generation failed" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/event-stream",
+        "X-Model-Used": "gemini",
+      },
     });
-
   } catch (e) {
     console.error("generate-copy error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });
