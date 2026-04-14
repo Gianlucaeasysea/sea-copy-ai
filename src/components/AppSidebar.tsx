@@ -1,4 +1,4 @@
-import { LayoutDashboard, PlusCircle, BookOpen, Library, Settings, Sparkles } from "lucide-react";
+import { LayoutDashboard, PlusCircle, BookOpen, Library, HelpCircle, Settings, Sparkles } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -17,6 +17,7 @@ const items = [
   { title: "New Campaign", url: "/new-campaign", icon: PlusCircle },
   { title: "Library", url: "/library", icon: Library },
   { title: "Corrections", url: "/corrections", icon: BookOpen },
+  { title: "Guide", url: "/guide", icon: HelpCircle },
   { title: "Brand Settings", url: "/settings", icon: Settings },
 ];
 
