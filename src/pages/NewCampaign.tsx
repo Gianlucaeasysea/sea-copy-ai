@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, Info } from "lucide-react";
+
+const FRAMEWORK_CONTEXT: Record<string, { tagline: string; whenToUse: string }> = {
+  "AIDA": { tagline: "Il framework classico. Funziona sempre.", whenToUse: "Lancio prodotto, promo, newsletter con focus chiaro" },
+  "PAS": { tagline: "Il più potente per email emotive.", whenToUse: "Problemi specifici, riattivazione, email a freddo" },
+  "SOAP Opera Sequence": { tagline: "Non è una mail — è una serie di 4–7 email.", whenToUse: "Welcome sequence, lancio importante, brand storytelling" },
+  "Before-After-Bridge": { tagline: "Mostra la trasformazione. Semplice, efficace.", whenToUse: "Prodotti con beneficio visibile, testimonial" },
+  "4 Ps": { tagline: "Struttura da direct response. Ottima per promo con scadenza.", whenToUse: "Weekend deals, Black Friday, offerte a tempo" },
+  "StoryBrand": { tagline: "Il cliente è l'eroe. Tu sei la guida.", whenToUse: "Welcome, onboarding, brand storytelling" },
+  "Feature-Benefit-Proof": { tagline: "Per prodotti tecnici. La struttura più onesta.", whenToUse: "Lancio prodotto tecnico, comparativi, clienti caldi" },
+  "Plain Broadcast": { tagline: "Nessun framework. Solo comunicazione diretta.", whenToUse: "Aggiornamenti, annunci rapidi, newsletter leggere" },
+};
 
 const campaignTypes = [
   "Product Launch", "Promo Weekend", "Newsletter", "Storytelling",
@@ -108,6 +119,20 @@ export default function NewCampaign() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{frameworks.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
                 </Select>
+                {FRAMEWORK_CONTEXT[form.framework] && (
+                  <div className="flex items-start gap-2 p-2.5 bg-muted/50 rounded-md border border-dashed">
+                    <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium">{FRAMEWORK_CONTEXT[form.framework].tagline}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Ideale per: {FRAMEWORK_CONTEXT[form.framework].whenToUse}
+                      </p>
+                    </div>
+                    <Link to="/guide" className="text-xs text-primary underline shrink-0">
+                      Guida →
+                    </Link>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Subject Line Tone</Label>
