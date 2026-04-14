@@ -387,10 +387,16 @@ export default function CampaignEditor() {
           <Input value={previewText} onChange={(e) => setPreviewText(e.target.value)} className="h-8 text-sm font-mono text-xs" />
         </div>
         <div className="flex items-center gap-2 pt-4">
-          <Button size="sm" variant="outline" onClick={generate} disabled={generating}>
+          <Button size="sm" variant="outline" onClick={() => generate()} disabled={generating}>
             <RefreshCw className={`mr-1 h-3 w-3 ${generating ? "animate-spin" : ""}`} />
             {generating ? "Generating..." : aiBody ? "Regenerate" : "Generate"}
           </Button>
+          {aiBody && !generating && (
+            <Button size="sm" variant="outline" onClick={() => setShowRefine(true)} className="text-destructive border-destructive/30 hover:bg-destructive/10">
+              <Trash2 className="mr-1 h-3 w-3" />
+              Scarta & Rifai
+            </Button>
+          )}
           {aiBody !== editBody && (
             <Button size="sm" variant="outline" onClick={handleMarkCorrection}>
               <Pencil className="mr-1 h-3 w-3" />
