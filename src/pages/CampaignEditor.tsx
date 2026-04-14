@@ -24,6 +24,7 @@ export default function CampaignEditor() {
   const [editBody, setEditBody] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [pushingKlaviyo, setPushingKlaviyo] = useState(false);
   const [showCorrection, setShowCorrection] = useState(false);
   const [correctionCategory, setCorrectionCategory] = useState("Terminology");
   const [correctionNote, setCorrectionNote] = useState("");
@@ -46,6 +47,27 @@ export default function CampaignEditor() {
     };
     load();
   }, [id]);
+
+  const saveToLibrary = async (
+    subj: string,
+    preview: string,
+    body: string,
+    wa: string,
+    modelUsed: string
+  ) => {
+    if (!campaign) return;
+    await supabase.from("generated_emails").insert({
+      campaign_id: campaign.id,
+      campaign_name: campaign.name,
+      subject_line: subj,
+      preview_text: preview,
+      body_markdown: body,
+      whatsapp_copy: wa,
+      language: campaign.language,
+      framework: campaign.framework,
+      model_used: modelUsed,
+    });
+  };
 
   const generate = async () => {
     setGenerating(true);
@@ -74,6 +96,8 @@ export default function CampaignEditor() {
         setGenerating(false);
         return;
       }
+
+      const modelUsed = resp.headers.get("X-Model-Used") || "gemini";
 
       const reader = resp.body!.getReader();
       const decoder = new TextDecoder();
@@ -107,9 +131,21 @@ export default function CampaignEditor() {
 
       // Parse structured output from the full text
       const subjectMatch = fullText.match(/## Subject Line\n(.+)/);
+      const previewMatch = fullText.match(/## Preview Text\n(.+)/);
       const whatsappMatch = fullText.match(/## WhatsApp Version\n([\s\S]+?)(?=\n## |$)/);
-      if (subjectMatch) setSubjectLine(subjectMatch[1].trim());
-      if (whatsappMatch) setWhatsapp(whatsappMatch[1].trim());
+      const bodyMatch = fullText.match(/## Email Body\n([\s\S]+?)(?=\n## WhatsApp|$)/);
+
+      const parsedSubject = subjectMatch ? subjectMatch[1].trim() : "";
+      const parsedPreview = previewMatch ? previewMatch[1].trim() : "";
+      const parsedBody = bodyMatch ? bodyMatch[1].trim() : fullText;
+      const parsedWhatsapp = whatsappMatch ? whatsappMatch[1].trim() : "";
+
+      if (parsedSubject) setSubjectLine(parsedSubject);
+      if (parsedPreview) setPreviewText(parsedPreview);
+      if (parsedWhatsapp) setWhatsapp(parsedWhatsapp);
+
+      // Auto-save to library
+      await saveToLibrary(parsedSubject, parsedPreview, parsedBody, parsedWhatsapp, modelUsed);
 
     } catch (e: any) {
       if (e.name !== "AbortError") toast.error("Generation error");
@@ -135,12 +171,38 @@ export default function CampaignEditor() {
     toast.success("Campaign approved!");
   };
 
+  const handlePushToKlaviyo = async () => {
+    if (!campaign) return;
+    setPushingKlaviyo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("push-to-klaviyo", {
+        body: { campaign_id: campaign.id },
+      });
+      if (error) throw error;
+      if (data?.klaviyo_url) {
+        toast.success(
+          <span>
+            Pushed to Klaviyo!{" "}
+            <a href={data.klaviyo_url} target="_blank" rel="noopener noreferrer" className="underline">
+              Open in Klaviyo →
+            </a>
+          </span>
+        );
+      } else {
+        toast.success("Campaign pushed to Klaviyo as draft");
+      }
+    } catch (e: any) {
+      toast.error("Klaviyo push failed: " + (e?.message || "unknown error"));
+    } finally {
+      setPushingKlaviyo(false);
+    }
+  };
+
   const handleMarkCorrection = () => {
     if (aiBody === editBody) {
       toast.info("No changes detected");
       return;
     }
-    // Simple diff: find first difference
     const oldLines = aiBody.split("\n");
     const newLines = editBody.split("\n");
     let oldDiff = "", newDiff = "";
@@ -199,6 +261,15 @@ export default function CampaignEditor() {
           </Button>
           <Button size="sm" onClick={approve}>
             <Check className="mr-1 h-3 w-3" /> Approve
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handlePushToKlaviyo}
+            disabled={pushingKlaviyo || !campaign?.subject_line}
+          >
+            <Send className="mr-1 h-3 w-3" />
+            {pushingKlaviyo ? "Pushing..." : "→ Klaviyo"}
           </Button>
         </div>
       </div>
