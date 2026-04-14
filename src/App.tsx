@@ -9,6 +9,7 @@ import NewCampaign from "./pages/NewCampaign";
 import CampaignEditor from "./pages/CampaignEditor";
 import Corrections from "./pages/Corrections";
 import BrandSettings from "./pages/BrandSettings";
+import Library from "./pages/Library";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/new-campaign" element={<NewCampaign />} />
             <Route path="/campaign/:id" element={<CampaignEditor />} />
+            <Route path="/library" element={<Library />} />
             <Route path="/corrections" element={<Corrections />} />
             <Route path="/settings" element={<BrandSettings />} />
             <Route path="*" element={<NotFound />} />
