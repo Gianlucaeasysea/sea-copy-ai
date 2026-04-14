@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RefreshCw, Check, Save, Send, Pencil } from "lucide-react";
+import EmailPreview from "@/components/EmailPreview";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -129,7 +130,6 @@ export default function CampaignEditor() {
         }
       }
 
-      // Parse structured output from the full text
       const subjectMatch = fullText.match(/## Subject Line\n(.+)/);
       const previewMatch = fullText.match(/## Preview Text\n(.+)/);
       const whatsappMatch = fullText.match(/## WhatsApp Version\n([\s\S]+?)(?=\n## |$)/);
@@ -144,7 +144,6 @@ export default function CampaignEditor() {
       if (parsedPreview) setPreviewText(parsedPreview);
       if (parsedWhatsapp) setWhatsapp(parsedWhatsapp);
 
-      // Auto-save to library
       await saveToLibrary(parsedSubject, parsedPreview, parsedBody, parsedWhatsapp, modelUsed);
 
     } catch (e: any) {
@@ -276,24 +275,11 @@ export default function CampaignEditor() {
 
       {/* Split view */}
       <div className="flex-1 flex overflow-hidden">
+        {/* Left: Editable */}
         <div className="flex-1 border-r overflow-auto p-6">
           <div className="flex items-center gap-2 mb-3">
-            <Badge variant="secondary" className="text-xs">AI Generated</Badge>
+            <Badge variant="secondary" className="text-xs">Editable</Badge>
             <Badge variant="outline" className="text-xs">{campaign.framework}</Badge>
-          </div>
-          {aiBody ? (
-            <div className="prose prose-sm max-w-none font-mono text-sm whitespace-pre-wrap leading-relaxed">
-              {aiBody}
-            </div>
-          ) : (
-            <div className="text-center py-20 text-muted-foreground">
-              <p>Click "Regenerate" to generate copy</p>
-            </div>
-          )}
-        </div>
-        <div className="flex-1 overflow-auto p-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Badge className="text-xs bg-primary/10 text-primary border-0">Editable</Badge>
           </div>
           <Textarea
             value={editBody}
@@ -311,6 +297,19 @@ export default function CampaignEditor() {
               />
             </div>
           )}
+        </div>
+
+        {/* Right: Visual Preview */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <EmailPreview
+            subjectLine={subjectLine}
+            previewText={previewText}
+            bodyMarkdown={aiBody}
+            whatsappCopy={whatsapp}
+            heroImageUrl={(campaign as any)?.hero_image_url}
+            products={(campaign as any)?.products_data as any[] || []}
+            language={campaign?.language}
+          />
         </div>
       </div>
 

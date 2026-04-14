@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowRight, Sparkles, Info } from "lucide-react";
+import { ArrowRight, Sparkles, Info, ShoppingBag, X } from "lucide-react";
+import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
 
 const FRAMEWORK_CONTEXT: Record<string, { tagline: string; whenToUse: string }> = {
   "AIDA": { tagline: "Il framework classico. Funziona sempre.", whenToUse: "Lancio prodotto, promo, newsletter con focus chiaro" },
@@ -46,6 +47,10 @@ export default function NewCampaign() {
     preview_text: "{{ person.first_name|title|default:'Sea Lover' }}",
   });
   const [loading, setLoading] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<ShopifyProduct[]>([]);
+  const [selectedCollection, setSelectedCollection] = useState<ShopifyCollection | null>(null);
+  const [heroImageUrl, setHeroImageUrl] = useState("");
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -64,7 +69,10 @@ export default function NewCampaign() {
       context_notes: form.context_notes || null,
       preview_text: form.preview_text,
       status: "draft",
-    }).select().single();
+      products_data: selectedProducts.length > 0 ? selectedProducts as any : null,
+      collection_name: selectedCollection?.title || null,
+      hero_image_url: heroImageUrl || selectedProducts[0]?.image_url || null,
+    } as any).select().single();
 
     if (error) {
       toast.error("Failed to create campaign");
@@ -155,6 +163,66 @@ export default function NewCampaign() {
             <CardTitle className="text-lg">Additional Context</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
+            {/* Product / Collection Picker */}
+            <div className="space-y-2">
+              <Label>Prodotti o Collezione in evidenza</Label>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => setPickerOpen(true)}
+              >
+                <ShoppingBag className="mr-2 h-4 w-4" />
+                {selectedProducts.length > 0
+                  ? `${selectedProducts.length} prodotti selezionati`
+                  : selectedCollection
+                  ? `Collezione: ${selectedCollection.title}`
+                  : "Scegli da Shopify…"}
+              </Button>
+
+              {selectedProducts.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedProducts.map((p) => (
+                    <div key={p.id} className="flex items-center gap-1.5 bg-muted rounded-md px-2 py-1">
+                      {p.image_url && (
+                        <img src={p.image_url} alt={p.title} className="h-6 w-6 rounded object-cover" />
+                      )}
+                      <span className="text-xs">{p.title}</span>
+                      <button
+                        onClick={() => setSelectedProducts((prev) => prev.filter((x) => x.id !== p.id))}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <ProductPicker
+                open={pickerOpen}
+                onClose={() => setPickerOpen(false)}
+                selectedProducts={selectedProducts}
+                onSelect={(products, collection) => {
+                  setSelectedProducts(products);
+                  setSelectedCollection(collection);
+                }}
+              />
+            </div>
+
+            {/* Hero image URL */}
+            <div className="space-y-2">
+              <Label>Immagine hero (opzionale)</Label>
+              <Input
+                value={heroImageUrl}
+                onChange={(e) => setHeroImageUrl(e.target.value)}
+                placeholder="https://cdn.shopify.com/... oppure lascia vuoto"
+              />
+              <p className="text-xs text-muted-foreground">
+                URL immagine per la sezione hero dell'email. Se vuoto usa la prima immagine del prodotto principale.
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label>Preview Text Variable</Label>
               <Input value={form.preview_text} onChange={(e) => update("preview_text", e.target.value)} className="font-mono text-xs" />

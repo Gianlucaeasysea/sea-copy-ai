@@ -80,15 +80,18 @@ export type Database = {
       campaigns: {
         Row: {
           body_markdown: string | null
+          collection_name: string | null
           context_notes: string | null
           created_at: string
           framework: string
+          hero_image_url: string | null
           id: string
           klaviyo_campaign_id: string | null
           language: string
           name: string
           notion_url: string | null
           preview_text: string | null
+          products_data: Json | null
           shopify_product_ids: string[] | null
           status: string
           subject_line: string | null
@@ -99,15 +102,18 @@ export type Database = {
         }
         Insert: {
           body_markdown?: string | null
+          collection_name?: string | null
           context_notes?: string | null
           created_at?: string
           framework?: string
+          hero_image_url?: string | null
           id?: string
           klaviyo_campaign_id?: string | null
           language?: string
           name: string
           notion_url?: string | null
           preview_text?: string | null
+          products_data?: Json | null
           shopify_product_ids?: string[] | null
           status?: string
           subject_line?: string | null
@@ -118,15 +124,18 @@ export type Database = {
         }
         Update: {
           body_markdown?: string | null
+          collection_name?: string | null
           context_notes?: string | null
           created_at?: string
           framework?: string
+          hero_image_url?: string | null
           id?: string
           klaviyo_campaign_id?: string | null
           language?: string
           name?: string
           notion_url?: string | null
           preview_text?: string | null
+          products_data?: Json | null
           shopify_product_ids?: string[] | null
           status?: string
           subject_line?: string | null
