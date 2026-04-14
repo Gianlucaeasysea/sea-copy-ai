@@ -237,7 +237,9 @@ serve(async (req) => {
           },
           send_strategy: {
             method: "static",
-            options_static: null,
+            options_static: {
+              datetime: new Date(Date.now() + 3600000).toISOString(),
+            },
           },
           "campaign-messages": {
             data: [
