@@ -96,19 +96,17 @@ export default function KlaviyoFlows() {
   const [flows, setFlows]             = useState<KlaviyoFlow[]>([]);
   const [loading, setLoading]         = useState(false);
   const [lastLoaded, setLastLoaded]   = useState<Date | null>(null);
-  const [timeframe, setTimeframe]     = useState<TimeframeKey>("last_30_days");
+  // timeframe removed
   const [kpiAvailable, setKpiAvailable] = useState<boolean | null>(null);
 
   const [expanded, setExpanded]             = useState<string | null>(null);
   const [flowEmails, setFlowEmails]         = useState<Record<string, FlowEmail[]>>({});
   const [loadingEmails, setLoadingEmails]   = useState<string | null>(null);
 
-  const load = async (tf: TimeframeKey = timeframe) => {
+  const load = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("get-klaviyo-flows", {
-        body: { timeframe: tf },
-      });
+      const { data, error } = await supabase.functions.invoke("get-klaviyo-flows");
       if (error) throw error;
       setFlows(data.flows || []);
       setKpiAvailable(data.kpi_available ?? false);
@@ -122,11 +120,7 @@ export default function KlaviyoFlows() {
 
   useEffect(() => { load(); }, []);
 
-  const handleTimeframeChange = (v: TimeframeKey) => {
-    setTimeframe(v);
-    setFlowEmails({});
-    load(v);
-  };
+  // timeframe change removed
 
   const toggleExpand = async (flowId: string) => {
     if (expanded === flowId) { setExpanded(null); return; }
@@ -154,8 +148,7 @@ export default function KlaviyoFlows() {
   const totalRevenue = flows.reduce((s, f) => s + (f.kpi?.revenue || 0), 0);
   const totalEmails  = flows.reduce((s, f) => s + f.email_count, 0);
 
-  const activeTfLabel = TIMEFRAME_OPTIONS.find((o) => o.value === timeframe)?.label || "";
-  const activeTfShort = TIMEFRAME_OPTIONS.find((o) => o.value === timeframe)?.short || "";
+  // timeframe labels removed
 
   const formatDate = (iso: string) =>
     iso ? new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -331,19 +324,6 @@ export default function KlaviyoFlows() {
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-            <Select value={timeframe} onValueChange={(v) => handleTimeframeChange(v as TimeframeKey)}>
-              <SelectTrigger className="w-44 h-9 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TIMEFRAME_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
           {lastLoaded && (
             <span className="text-xs text-muted-foreground">
               {lastLoaded.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
@@ -356,17 +336,11 @@ export default function KlaviyoFlows() {
         </div>
       </div>
 
-      {lastLoaded && (
+      {/* KPI warning if needed */}
+      {lastLoaded && kpiAvailable === false && (
         <p className="text-xs text-muted-foreground -mt-3 flex items-center gap-1.5">
-          <CalendarDays className="h-3.5 w-3.5" />
-          KPI periodo:
-          <strong className="text-foreground">{activeTfLabel}</strong>
-          {kpiAvailable === false && (
-            <span className="ml-2 flex items-center gap-1 text-amber-600">
-              <AlertCircle className="h-3 w-3" />
-              Dati KPI non disponibili dal tuo piano Klaviyo
-            </span>
-          )}
+          <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+          Dati KPI non disponibili dal tuo piano Klaviyo
         </p>
       )}
 
@@ -412,7 +386,7 @@ export default function KlaviyoFlows() {
                 <p className={`text-2xl font-bold ${totalRevenue > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
                   {totalRevenue > 0 ? fmtEur(totalRevenue) : "—"}
                 </p>
-                <p className="text-xs text-muted-foreground">Fatturato {activeTfShort}</p>
+                <p className="text-xs text-muted-foreground">Fatturato</p>
               </div>
             </div>
           </CardContent>
