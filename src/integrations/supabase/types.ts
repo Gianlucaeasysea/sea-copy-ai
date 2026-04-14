@@ -86,12 +86,14 @@ export type Database = {
           framework: string
           hero_image_url: string | null
           id: string
+          is_sequence: boolean | null
           klaviyo_campaign_id: string | null
           language: string
           name: string
           notion_url: string | null
           preview_text: string | null
           products_data: Json | null
+          sequence_emails: Json | null
           shopify_product_ids: string[] | null
           status: string
           subject_line: string | null
@@ -108,12 +110,14 @@ export type Database = {
           framework?: string
           hero_image_url?: string | null
           id?: string
+          is_sequence?: boolean | null
           klaviyo_campaign_id?: string | null
           language?: string
           name: string
           notion_url?: string | null
           preview_text?: string | null
           products_data?: Json | null
+          sequence_emails?: Json | null
           shopify_product_ids?: string[] | null
           status?: string
           subject_line?: string | null
@@ -130,12 +134,14 @@ export type Database = {
           framework?: string
           hero_image_url?: string | null
           id?: string
+          is_sequence?: boolean | null
           klaviyo_campaign_id?: string | null
           language?: string
           name?: string
           notion_url?: string | null
           preview_text?: string | null
           products_data?: Json | null
+          sequence_emails?: Json | null
           shopify_product_ids?: string[] | null
           status?: string
           subject_line?: string | null
