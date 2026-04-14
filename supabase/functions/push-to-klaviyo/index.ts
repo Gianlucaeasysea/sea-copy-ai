@@ -20,19 +20,25 @@ function formatPrice(price: string): string {
   return `€${parseFloat(price).toLocaleString("it-IT", { minimumFractionDigits: 2 })}`;
 }
 
-function renderMarkdownToHtml(md: string): string {
+function renderMarkdownToHtml(md: string, dark = false): string {
+  const fg = dark ? "#ffffff" : "#0A1628";
+  const bodyColor = dark ? "#cccccc" : "#333";
+  const linkColor = dark ? "#4355DB" : "#00C9B1";
+  const ctaBg = dark ? "#4355DB" : "#0A1628";
+  const strikeFg = dark ? "#666" : "#999";
+
   return md
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/~~(.*?)~~/g, '<s style="color:#999">$1</s>')
-    .replace(/^#{1,2} (.+)$/gm, '<h2 style="font-family:Inter,Arial,sans-serif;font-size:22px;font-weight:700;margin:20px 0 8px;color:#0A1628;line-height:1.3">$1</h2>')
-    .replace(/^#{3,6} (.+)$/gm, '<h3 style="font-family:Inter,Arial,sans-serif;font-size:16px;font-weight:600;margin:16px 0 6px;color:#0A1628;line-height:1.3">$1</h3>')
-    .replace(/^[-*] (.+)$/gm, '<li style="margin:4px 0;font-family:Inter,Arial,sans-serif;font-size:15px;color:#333;line-height:1.6">$1</li>')
-    .replace(/(<li[^>]*>.*<\/li>)/gs, '<ul style="padding-left:20px;margin:12px 0">$1</ul>')
-    .replace(/→ (.+)/g, `<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" style="height:40px;v-text-anchor:middle;width:200px" arcsize="15%" strokecolor="#0A1628" fillcolor="#0A1628"><center style="color:#fff;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600">→ $1</center></v:roundrect><![endif]--><a href="#" style="display:inline-block;background:#0A1628;color:#ffffff;padding:10px 24px;border-radius:6px;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin:8px 0;mso-hide:all">→ $1</a>`)
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" style="color:#00C9B1;text-decoration:underline">$1</a>')
-    .replace(/\n\n/g, '</p><p style="margin:12px 0;line-height:1.6;color:#333;font-family:Inter,Arial,sans-serif;font-size:15px">')
-    .replace(/^(?!<[huap])/, '<p style="margin:12px 0;line-height:1.6;color:#333;font-family:Inter,Arial,sans-serif;font-size:15px">')
+    .replace(/~~(.*?)~~/g, `<s style="color:${strikeFg}">$1</s>`)
+    .replace(/^#{1,2} (.+)$/gm, `<h2 style="font-family:Inter,Arial,sans-serif;font-size:24px;font-weight:700;margin:24px 0 10px;color:${fg};line-height:1.25;letter-spacing:-0.3px">$1</h2>`)
+    .replace(/^#{3,6} (.+)$/gm, `<h3 style="font-family:Inter,Arial,sans-serif;font-size:17px;font-weight:600;margin:18px 0 6px;color:${fg};line-height:1.3">$1</h3>`)
+    .replace(/^[-*] (.+)$/gm, `<li style="margin:6px 0;font-family:Inter,Arial,sans-serif;font-size:15px;color:${bodyColor};line-height:1.7">$1</li>`)
+    .replace(/(<li[^>]*>.*<\/li>)/gs, '<ul style="padding-left:20px;margin:14px 0">$1</ul>')
+    .replace(/→ (.+)/g, `<a href="#" style="display:inline-block;background:${ctaBg};color:#ffffff;padding:12px 28px;border-radius:8px;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin:12px 0;letter-spacing:0.3px">→ $1</a>`)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, `<a href="$2" style="color:${linkColor};text-decoration:underline">$1</a>`)
+    .replace(/\n\n/g, `</p><p style="margin:14px 0;line-height:1.7;color:${bodyColor};font-family:Inter,Arial,sans-serif;font-size:15px">`)
+    .replace(/^(?!<[huap])/, `<p style="margin:14px 0;line-height:1.7;color:${bodyColor};font-family:Inter,Arial,sans-serif;font-size:15px">`)
     .replace(/(?<![>])$/, "</p>");
 }
 
@@ -71,6 +77,35 @@ function buildProductCardsHtml(products: Product[]): string {
   }
 
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px">${rows}</table>`;
+}
+
+function buildDarkProductCardsHtml(products: Product[]): string {
+  if (!products || products.length === 0) return "";
+  const cards = products.map((p) => {
+    const imgHtml = p.image_url
+      ? `<img src="${p.image_url}" alt="${p.title}" style="display:block;width:100%;border-radius:12px 12px 0 0" />`
+      : "";
+    const compareHtml = p.compare_at_price
+      ? `<span style="font-size:12px;color:#666;text-decoration:line-through;margin-right:6px">${formatPrice(p.compare_at_price)}</span>`
+      : "";
+    const priceColor = p.compare_at_price ? "#ef4444" : "#ffffff";
+    const ctaLabel = p.in_stock ? "Shop now →" : "Discover →";
+    return `<td style="width:50%;vertical-align:top;padding:8px">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:12px;overflow:hidden;background:#111111">
+        <tr><td>${imgHtml}</td></tr>
+        <tr><td style="padding:14px 16px">
+          <p style="font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin:0 0 6px;color:#ffffff;line-height:1.3">${p.title}</p>
+          <p style="margin:0 0 12px">${compareHtml}<span style="font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:700;color:${priceColor}">${formatPrice(p.price)}</span></p>
+          <a href="${p.url}" target="_blank" style="display:block;background:#4355DB;color:#fff;text-align:center;padding:10px 0;border-radius:8px;font-family:Inter,Arial,sans-serif;font-size:13px;font-weight:600;text-decoration:none">${ctaLabel}</a>
+        </td></tr>
+      </table>
+    </td>`;
+  });
+  let rows = "";
+  for (let i = 0; i < cards.length; i += 2) {
+    rows += `<tr>${cards[i]}${cards[i + 1] || "<td></td>"}</tr>`;
+  }
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px">${rows}</table>`;
 }
 
 function buildBrandedHtml(campaign: any, fromName: string): string {
@@ -142,11 +177,78 @@ ${productCardsHtml}
 </html>`;
 }
 
+function buildDarkBrandedHtml(campaign: any, fromName: string): string {
+  const bodyHtml = renderMarkdownToHtml(campaign.body_markdown || "", true);
+  const products: Product[] = Array.isArray(campaign.products_data) ? campaign.products_data : [];
+  const productCardsHtml = buildDarkProductCardsHtml(products);
+
+  const heroHtml = campaign.hero_image_url
+    ? `<tr><td><img src="${campaign.hero_image_url}" alt="Hero" width="600" style="display:block;width:100%;max-height:360px;object-fit:cover" /></td></tr>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+<title>${campaign.subject_line || campaign.name}</title>
+<style>
+  body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+  table,td{mso-table-lspace:0;mso-table-rspace:0}
+  img{-ms-interpolation-mode:bicubic;border:0;height:auto;line-height:100%;outline:none;text-decoration:none}
+  body{margin:0;padding:0;width:100%!important;background-color:#000000}
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#000000">
+<center>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#000000">
+<tr><td align="center" style="padding:20px 0">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#0a0a0a;border-radius:16px;overflow:hidden">
+
+<!-- Header -->
+<tr><td style="padding:20px 32px">
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td style="color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:800;font-size:20px;letter-spacing:-1px">easysea<span style="font-weight:400;font-size:14px;vertical-align:super;color:#999">®</span></td>
+<td align="right"><a href="https://www.easysea.org" style="font-family:Inter,Arial,sans-serif;font-size:12px;font-weight:500;color:#4355DB;text-decoration:none;letter-spacing:0.3px">easysea.org →</a></td>
+</tr></table>
+</td></tr>
+
+<!-- Blue accent line -->
+<tr><td style="padding:0 32px"><div style="height:2px;background:linear-gradient(90deg,#4355DB,transparent);border-radius:2px"></div></td></tr>
+
+${heroHtml}
+
+<!-- Body -->
+<tr><td style="padding:28px 32px 16px;font-family:Inter,Arial,sans-serif">
+${bodyHtml}
+${productCardsHtml}
+</td></tr>
+
+<!-- Footer -->
+<tr><td style="padding:20px 32px 24px;border-top:1px solid #222;text-align:center">
+<p style="font-family:Inter,Arial,sans-serif;font-size:11px;color:#555;margin:0;letter-spacing:0.5px">EASYSEA® · Beautiful and innovative nautical accessories</p>
+<p style="font-family:Inter,Arial,sans-serif;font-size:11px;color:#444;margin:8px 0 0">
+<a href="{{ unsubscribe_url }}" style="color:#555;text-decoration:underline">Unsubscribe</a>
+<span style="color:#333;margin:0 8px">·</span>
+<a href="https://www.easysea.org" style="color:#4355DB;text-decoration:none;font-weight:500">Visit easysea.org</a>
+</p>
+</td></tr>
+
+</table>
+</td></tr></table>
+</center>
+</body>
+</html>`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { campaign_id } = await req.json();
+    const { campaign_id, branded_style } = await req.json();
     if (!campaign_id) throw new Error("campaign_id required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -176,8 +278,10 @@ serve(async (req) => {
       revision,
     };
 
-    // 1. Build branded HTML
-    const brandedHtml = buildBrandedHtml(campaign, fromName);
+    // 1. Build HTML (branded dark or classic)
+    const brandedHtml = branded_style
+      ? buildDarkBrandedHtml(campaign, fromName)
+      : buildBrandedHtml(campaign, fromName);
 
     // 2. Create Klaviyo template
     const templateRes = await fetch("https://a.klaviyo.com/api/templates/", {

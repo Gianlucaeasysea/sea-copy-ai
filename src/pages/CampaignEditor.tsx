@@ -93,6 +93,7 @@ export default function CampaignEditor() {
   const [productElements, setProductElements] = useState<Record<string, ProductElements>>({});
   const [elementPickerProduct, setElementPickerProduct] = useState<ShopifyProduct | null>(null);
   const [heroCreatorOpen, setHeroCreatorOpen] = useState(false);
+  const [brandedStyle, setBrandedStyle] = useState(false);
 
   // Sequence state
   const [parsedEmails, setParsedEmails] = useState<ParsedEmail[]>([]);
@@ -337,7 +338,7 @@ export default function CampaignEditor() {
     setPushingKlaviyo(true);
     try {
       const { data, error } = await supabase.functions.invoke("push-to-klaviyo", {
-        body: { campaign_id: campaign.id },
+        body: { campaign_id: campaign.id, branded_style: brandedStyle },
       });
       if (error) throw error;
       if (data?.klaviyo_url) {
@@ -613,6 +614,8 @@ export default function CampaignEditor() {
             heroImageUrl={(campaign as any)?.hero_image_url}
             products={editorProducts.length > 0 ? editorProducts : ((campaign as any)?.products_data as any[] || [])}
             language={campaign?.language}
+            branded={brandedStyle}
+            onBrandedChange={setBrandedStyle}
           />
         </div>
       </div>
