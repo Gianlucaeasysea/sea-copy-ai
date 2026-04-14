@@ -21,6 +21,7 @@ interface MarketingEvent {
   id: string;
   name: string;
   event_date: string;
+  end_date: string | null;
   event_type: string;
   campaign_id: string | null;
   notes: string | null;
@@ -42,6 +43,14 @@ const TYPE_COLORS: Record<string, string> = {
   content: "bg-emerald-500",
   other: "bg-gray-400",
 };
+const TYPE_BG_COLORS: Record<string, string> = {
+  promo: "bg-blue-500/80 text-white",
+  launch: "bg-purple-500/80 text-white",
+  seasonal: "bg-amber-500/80 text-white",
+  holiday: "bg-red-500/80 text-white",
+  content: "bg-emerald-500/80 text-white",
+  other: "bg-gray-400/80 text-white",
+};
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -49,7 +58,7 @@ function getDaysInMonth(year: number, month: number) {
 
 function getFirstDayOfWeek(year: number, month: number) {
   const d = new Date(year, month, 1).getDay();
-  return d === 0 ? 6 : d - 1; // Monday-start
+  return d === 0 ? 6 : d - 1;
 }
 
 const MONTHS_IT = [
@@ -58,6 +67,24 @@ const MONTHS_IT = [
 ];
 
 const WEEKDAYS = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+
+/** Parse YYYY-MM-DD to a comparable number YYYYMMDD */
+function dateToNum(d: string) {
+  return parseInt(d.replace(/-/g, ""), 10);
+}
+
+function dateStr(year: number, month: number, day: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+interface SpanBar {
+  event: MarketingEvent;
+  row: number;
+  startCol: number; // 0-6 within the week row
+  spanCols: number; // how many cols this bar spans
+  isStart: boolean; // is this the first segment of the event
+  isEnd: boolean; // is this the last segment
+}
 
 export default function MarketingCalendar() {
   const navigate = useNavigate();
@@ -69,21 +96,19 @@ export default function MarketingCalendar() {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  // Dialog state
   const [showAdd, setShowAdd] = useState(false);
   const [editEvent, setEditEvent] = useState<MarketingEvent | null>(null);
   const [formName, setFormName] = useState("");
   const [formDate, setFormDate] = useState("");
+  const [formEndDate, setFormEndDate] = useState("");
   const [formType, setFormType] = useState("promo");
   const [formNotes, setFormNotes] = useState("");
   const [formCampaignId, setFormCampaignId] = useState<string>("none");
 
-  // CSV import
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Notion import
   const [notionUrl, setNotionUrl] = useState("");
   const [notionLoading, setNotionLoading] = useState(false);
   const [notionPreview, setNotionPreview] = useState<any[] | null>(null);
@@ -101,22 +126,26 @@ export default function MarketingCalendar() {
 
   useEffect(() => { load(); }, []);
 
-  // Group events by date
-  const eventsByDate = useMemo(() => {
-    const map: Record<string, MarketingEvent[]> = {};
-    events.forEach((e) => {
-      (map[e.event_date] ??= []).push(e);
-    });
-    return map;
-  }, [events]);
-
   const campaignMap = useMemo(() => {
     const m: Record<string, Campaign> = {};
     campaigns.forEach((c) => (m[c.id] = c));
     return m;
   }, [campaigns]);
 
-  // Navigation
+  // Split events into single-day and multi-day
+  const { singleDayByDate, multiDayEvents } = useMemo(() => {
+    const single: Record<string, MarketingEvent[]> = {};
+    const multi: MarketingEvent[] = [];
+    events.forEach((e) => {
+      if (e.end_date && e.end_date !== e.event_date) {
+        multi.push(e);
+      } else {
+        (single[e.event_date] ??= []).push(e);
+      }
+    });
+    return { singleDayByDate: single, multiDayEvents: multi };
+  }, [events]);
+
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(viewYear - 1); }
     else setViewMonth(viewMonth - 1);
@@ -127,11 +156,11 @@ export default function MarketingCalendar() {
   };
   const goToday = () => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); };
 
-  // Form helpers
-  const openAdd = (dateStr?: string) => {
+  const openAdd = (dateString?: string) => {
     setEditEvent(null);
     setFormName("");
-    setFormDate(dateStr || `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-01`);
+    setFormDate(dateString || `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-01`);
+    setFormEndDate("");
     setFormType("promo");
     setFormNotes("");
     setFormCampaignId("none");
@@ -142,6 +171,7 @@ export default function MarketingCalendar() {
     setEditEvent(ev);
     setFormName(ev.name);
     setFormDate(ev.event_date);
+    setFormEndDate(ev.end_date || "");
     setFormType(ev.event_type);
     setFormNotes(ev.notes || "");
     setFormCampaignId(ev.campaign_id || "none");
@@ -150,9 +180,10 @@ export default function MarketingCalendar() {
 
   const saveEvent = async () => {
     if (!formName.trim() || !formDate) return;
-    const payload = {
+    const payload: any = {
       name: formName.trim(),
       event_date: formDate,
+      end_date: formEndDate || null,
       event_type: formType,
       notes: formNotes.trim() || null,
       campaign_id: formCampaignId === "none" ? null : formCampaignId,
@@ -163,7 +194,7 @@ export default function MarketingCalendar() {
       if (error) { toast.error("Update failed"); return; }
       toast.success("Evento aggiornato");
     } else {
-      const { error } = await supabase.from("marketing_events").insert(payload as any);
+      const { error } = await supabase.from("marketing_events").insert(payload);
       if (error) { toast.error("Insert failed"); return; }
       toast.success("Evento creato");
     }
@@ -177,7 +208,6 @@ export default function MarketingCalendar() {
     load();
   };
 
-  // CSV Import
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -189,18 +219,14 @@ export default function MarketingCalendar() {
   const importCsv = async () => {
     const lines = csvText.trim().split("\n").filter(Boolean);
     if (lines.length < 2) { toast.error("CSV vuoto o senza header"); return; }
-
     const header = lines[0].toLowerCase().split(/[;,\t]/);
     const nameIdx = header.findIndex((h) => h.includes("name") || h.includes("nome") || h.includes("evento"));
     const dateIdx = header.findIndex((h) => h.includes("date") || h.includes("data"));
     const typeIdx = header.findIndex((h) => h.includes("type") || h.includes("tipo"));
     const notesIdx = header.findIndex((h) => h.includes("note") || h.includes("notes") || h.includes("desc"));
-
     if (nameIdx < 0 || dateIdx < 0) {
-      toast.error("CSV deve avere colonne 'nome/name' e 'data/date'");
-      return;
+      toast.error("CSV deve avere colonne 'nome/name' e 'data/date'"); return;
     }
-
     const rows = lines.slice(1).map((line) => {
       const cols = line.split(/[;,\t]/);
       return {
@@ -210,9 +236,7 @@ export default function MarketingCalendar() {
         notes: notesIdx >= 0 ? cols[notesIdx]?.trim() || null : null,
       };
     }).filter((r) => r.event_date && /\d{4}-\d{2}-\d{2}/.test(r.event_date));
-
     if (!rows.length) { toast.error("Nessuna riga valida trovata (formato data: YYYY-MM-DD)"); return; }
-
     const { error } = await supabase.from("marketing_events").insert(rows as any);
     if (error) { toast.error("Import failed: " + error.message); return; }
     toast.success(`${rows.length} eventi importati`);
@@ -221,7 +245,6 @@ export default function MarketingCalendar() {
     load();
   };
 
-  // Notion import
   const fetchNotion = async () => {
     if (!notionUrl.trim()) return;
     setNotionLoading(true);
@@ -262,12 +285,118 @@ export default function MarketingCalendar() {
   // Calendar grid
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfWeek(viewYear, viewMonth);
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayStr = dateStr(today.getFullYear(), today.getMonth(), today.getDate());
 
   const cells: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
+
+  const totalWeekRows = cells.length / 7;
+
+  // Compute multi-day bar positions
+  const spanBars = useMemo(() => {
+    const bars: SpanBar[] = [];
+    // For each week row, track which "lane" rows are occupied
+    const weekLanes: Map<number, boolean[]>[] = [];
+    for (let w = 0; w < totalWeekRows; w++) weekLanes.push(new Map());
+
+    // Sort multi-day events by start date, then by duration (longer first)
+    const sorted = [...multiDayEvents].sort((a, b) => {
+      const diff = dateToNum(a.event_date) - dateToNum(b.event_date);
+      if (diff !== 0) return diff;
+      const durA = dateToNum(a.end_date!) - dateToNum(a.event_date);
+      const durB = dateToNum(b.end_date!) - dateToNum(b.event_date);
+      return durB - durA;
+    });
+
+    for (const ev of sorted) {
+      const evStart = dateToNum(ev.event_date);
+      const evEnd = dateToNum(ev.end_date!);
+
+      // Find which cells this event covers in the current month view
+      for (let weekRow = 0; weekRow < totalWeekRows; weekRow++) {
+        const weekStartIdx = weekRow * 7;
+        let firstCellInWeek = -1;
+        let lastCellInWeek = -1;
+
+        for (let col = 0; col < 7; col++) {
+          const day = cells[weekStartIdx + col];
+          if (day === null) continue;
+          const d = dateToNum(dateStr(viewYear, viewMonth, day));
+          if (d >= evStart && d <= evEnd) {
+            if (firstCellInWeek === -1) firstCellInWeek = col;
+            lastCellInWeek = col;
+          }
+        }
+
+        if (firstCellInWeek === -1) continue; // event doesn't touch this week
+
+        const spanCols = lastCellInWeek - firstCellInWeek + 1;
+
+        // Find a free lane
+        let lane = 0;
+        const lanes = weekLanes[weekRow];
+        while (true) {
+          let occupied = false;
+          if (!lanes.has(lane)) lanes.set(lane, Array(7).fill(false) as any);
+          // Check type properly
+          const laneSlots = lanes.get(lane) as unknown as boolean[];
+          for (let c = firstCellInWeek; c <= lastCellInWeek; c++) {
+            if (laneSlots[c]) { occupied = true; break; }
+          }
+          if (!occupied) break;
+          lane++;
+        }
+
+        // Mark slots occupied
+        const laneSlots = lanes.get(lane) as unknown as boolean[];
+        if (!laneSlots) lanes.set(lane, Array(7).fill(false) as any);
+        const slots = lanes.get(lane) as unknown as boolean[];
+        for (let c = firstCellInWeek; c <= lastCellInWeek; c++) slots[c] = true;
+
+        // Determine if this is the start/end segment
+        const firstDayInWeek = cells[weekStartIdx + firstCellInWeek]!;
+        const lastDayInWeek = cells[weekStartIdx + lastCellInWeek]!;
+        const isStart = dateToNum(dateStr(viewYear, viewMonth, firstDayInWeek)) === evStart;
+        const isEnd = dateToNum(dateStr(viewYear, viewMonth, lastDayInWeek)) === evEnd;
+
+        bars.push({
+          event: ev,
+          row: weekRow,
+          startCol: firstCellInWeek,
+          spanCols,
+          isStart,
+          isEnd,
+        });
+      }
+    }
+
+    return bars;
+  }, [multiDayEvents, cells, totalWeekRows, viewYear, viewMonth]);
+
+  // Group bars by week row
+  const barsByWeek = useMemo(() => {
+    const map: Record<number, SpanBar[]> = {};
+    spanBars.forEach((b) => (map[b.row] ??= []).push(b));
+    return map;
+  }, [spanBars]);
+
+  // Calculate max lanes per week (for spacing)
+  const maxLanesByWeek = useMemo(() => {
+    const m: Record<number, number> = {};
+    for (const b of spanBars) {
+      // We assigned lanes implicitly via order; count by checking overlapping bars
+    }
+    // Simpler: for each week, count distinct lanes
+    const weekLaneSets: Record<number, Set<string>> = {};
+    for (const b of spanBars) {
+      (weekLaneSets[b.row] ??= new Set()).add(b.event.id);
+    }
+    // Actually we need to compute lane index per bar. Let me re-approach via the bars.
+    // Since bars were assigned in order, I'll compute the lane from bar index collision.
+    return m;
+  }, [spanBars]);
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-4">
@@ -326,7 +455,6 @@ export default function MarketingCalendar() {
         <p className="text-muted-foreground text-sm">Caricamento…</p>
       ) : (
         <div className="border rounded-lg overflow-hidden">
-          {/* Weekday headers */}
           <div className="grid grid-cols-7 bg-muted/50 border-b">
             {WEEKDAYS.map((d) => (
               <div key={d} className="px-2 py-2 text-center text-xs font-medium text-muted-foreground">
@@ -335,57 +463,124 @@ export default function MarketingCalendar() {
             ))}
           </div>
 
-          {/* Day cells */}
-          <div className="grid grid-cols-7">
-            {cells.map((day, i) => {
-              if (day === null) return <div key={i} className="border-b border-r bg-muted/20 min-h-[100px]" />;
+          {/* Render week by week so we can overlay multi-day bars */}
+          {Array.from({ length: totalWeekRows }, (_, weekRow) => {
+            const weekCells = cells.slice(weekRow * 7, weekRow * 7 + 7);
+            const weekBars = barsByWeek[weekRow] || [];
+            // Count number of bar lanes needed
+            const laneCount = weekBars.length > 0
+              ? Math.max(...weekBars.map((_, idx) => idx)) + 1
+              : 0;
+            // Actually compute real lane indices by collision detection
+            const barLanes: number[] = [];
+            const laneOccupancy: boolean[][] = [];
+            for (const bar of weekBars) {
+              let lane = 0;
+              while (true) {
+                if (!laneOccupancy[lane]) laneOccupancy[lane] = Array(7).fill(false);
+                let free = true;
+                for (let c = bar.startCol; c < bar.startCol + bar.spanCols; c++) {
+                  if (laneOccupancy[lane][c]) { free = false; break; }
+                }
+                if (free) break;
+                lane++;
+              }
+              if (!laneOccupancy[lane]) laneOccupancy[lane] = Array(7).fill(false);
+              for (let c = bar.startCol; c < bar.startCol + bar.spanCols; c++) {
+                laneOccupancy[lane][c] = true;
+              }
+              barLanes.push(lane);
+            }
+            const totalLanes = laneOccupancy.length;
+            const barAreaHeight = totalLanes * 22; // 22px per lane
 
-              const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-              const dayEvents = eventsByDate[dateStr] || [];
-              const isToday = dateStr === todayStr;
+            return (
+              <div key={weekRow} className="relative">
+                <div className="grid grid-cols-7">
+                  {weekCells.map((day, col) => {
+                    if (day === null) return (
+                      <div key={col} className="border-b border-r bg-muted/20 min-h-[100px]" style={{ paddingTop: barAreaHeight > 0 ? barAreaHeight + 24 : undefined }} />
+                    );
 
-              return (
-                <div
-                  key={i}
-                  className={`border-b border-r min-h-[100px] p-1.5 cursor-pointer hover:bg-muted/30 transition-colors ${
-                    isToday ? "bg-primary/5" : ""
-                  }`}
-                  onClick={() => openAdd(dateStr)}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-medium ${isToday ? "bg-primary text-accent-foreground rounded-full w-6 h-6 flex items-center justify-center" : "text-muted-foreground"}`}>
-                      {day}
-                    </span>
-                  </div>
-                  <div className="space-y-0.5">
-                    {dayEvents.map((ev) => {
-                      const camp = ev.campaign_id ? campaignMap[ev.campaign_id] : null;
-                      const hasEmail = camp && (camp.status === "approved" || camp.subject_line);
-                      return (
-                        <div
-                          key={ev.id}
-                          className="group flex items-center gap-1 px-1 py-0.5 rounded text-[11px] leading-tight hover:bg-background/80 transition-colors"
-                          onClick={(e) => { e.stopPropagation(); openEdit(ev); }}
-                        >
-                          <span className={`h-2 w-2 rounded-full shrink-0 ${TYPE_COLORS[ev.event_type] || TYPE_COLORS.other}`} />
-                          <span className="truncate flex-1 font-medium">{ev.name}</span>
-                          {ev.campaign_id ? (
-                            hasEmail ? (
-                              <Check className="h-3 w-3 text-primary shrink-0" />
-                            ) : (
-                              <span className="text-amber-500 text-[10px] shrink-0">draft</span>
-                            )
-                          ) : (
-                            <X className="h-3 w-3 text-destructive/50 shrink-0" />
-                          )}
+                    const ds = dateStr(viewYear, viewMonth, day);
+                    const dayEvents = singleDayByDate[ds] || [];
+                    const isToday = ds === todayStr;
+
+                    return (
+                      <div
+                        key={col}
+                        className={`border-b border-r min-h-[100px] p-1.5 cursor-pointer hover:bg-muted/30 transition-colors ${isToday ? "bg-primary/5" : ""}`}
+                        onClick={() => openAdd(ds)}
+                        style={{ paddingTop: barAreaHeight > 0 ? barAreaHeight + 28 : undefined }}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-xs font-medium ${isToday ? "bg-primary text-accent-foreground rounded-full w-6 h-6 flex items-center justify-center" : "text-muted-foreground"}`}>
+                            {day}
+                          </span>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className="space-y-0.5">
+                          {dayEvents.map((ev) => {
+                            const camp = ev.campaign_id ? campaignMap[ev.campaign_id] : null;
+                            const hasEmail = camp && (camp.status === "approved" || camp.subject_line);
+                            return (
+                              <div
+                                key={ev.id}
+                                className="group flex items-center gap-1 px-1 py-0.5 rounded text-[11px] leading-tight hover:bg-background/80 transition-colors"
+                                onClick={(e) => { e.stopPropagation(); openEdit(ev); }}
+                              >
+                                <span className={`h-2 w-2 rounded-full shrink-0 ${TYPE_COLORS[ev.event_type] || TYPE_COLORS.other}`} />
+                                <span className="truncate flex-1 font-medium">{ev.name}</span>
+                                {ev.campaign_id ? (
+                                  hasEmail ? (
+                                    <Check className="h-3 w-3 text-primary shrink-0" />
+                                  ) : (
+                                    <span className="text-amber-500 text-[10px] shrink-0">draft</span>
+                                  )
+                                ) : (
+                                  <X className="h-3 w-3 text-destructive/50 shrink-0" />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Multi-day bars overlay */}
+                {weekBars.map((bar, idx) => {
+                  const lane = barLanes[idx];
+                  const colPercent = 100 / 7;
+                  const left = bar.startCol * colPercent;
+                  const width = bar.spanCols * colPercent;
+                  const top = 24 + lane * 22; // 24px offset for day number
+
+                  const typeColor = TYPE_BG_COLORS[bar.event.event_type] || TYPE_BG_COLORS.other;
+
+                  return (
+                    <div
+                      key={`${bar.event.id}-${weekRow}`}
+                      className={`absolute z-10 h-[18px] flex items-center cursor-pointer hover:opacity-90 transition-opacity ${typeColor} ${bar.isStart ? "rounded-l-md ml-1" : ""} ${bar.isEnd ? "rounded-r-md mr-1" : ""}`}
+                      style={{
+                        left: `${left}%`,
+                        width: `calc(${width}% - ${(bar.isStart ? 4 : 0) + (bar.isEnd ? 4 : 0)}px)`,
+                        marginLeft: bar.isStart ? "4px" : undefined,
+                        top: `${top}px`,
+                      }}
+                      onClick={(e) => { e.stopPropagation(); openEdit(bar.event); }}
+                    >
+                      {bar.isStart && (
+                        <span className="text-[10px] font-semibold truncate px-1.5 leading-none">
+                          {bar.event.name}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -402,22 +597,26 @@ export default function MarketingCalendar() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Data</Label>
+                <Label>Data inizio</Label>
                 <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Tipo</Label>
-                <Select value={formType} onValueChange={setFormType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {EVENT_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        <span className="capitalize">{t}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Data fine <span className="text-muted-foreground text-xs">(opzionale)</span></Label>
+                <Input type="date" value={formEndDate} onChange={(e) => setFormEndDate(e.target.value)} min={formDate} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={formType} onValueChange={setFormType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EVENT_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      <span className="capitalize">{t}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Campagna collegata</Label>
@@ -461,7 +660,6 @@ export default function MarketingCalendar() {
             <DialogTitle>Importa Eventi</DialogTitle>
           </DialogHeader>
           <div className="space-y-5">
-            {/* Notion section */}
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Da link Notion</Label>
               <p className="text-xs text-muted-foreground">
@@ -503,7 +701,6 @@ export default function MarketingCalendar() {
               <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">oppure</span></div>
             </div>
 
-            {/* CSV section */}
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Da file CSV</Label>
               <p className="text-xs text-muted-foreground">
