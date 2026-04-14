@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RefreshCw, Check, Save, Send, Pencil } from "lucide-react";
+import { RefreshCw, Check, Save, Send, Pencil, Trash2 } from "lucide-react";
 import EmailPreview from "@/components/EmailPreview";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -75,6 +75,8 @@ export default function CampaignEditor() {
   const [correctionNote, setCorrectionNote] = useState("");
   const [selectedOld, setSelectedOld] = useState("");
   const [selectedNew, setSelectedNew] = useState("");
+  const [showRefine, setShowRefine] = useState(false);
+  const [refineNotes, setRefineNotes] = useState("");
   const abortRef = useRef<AbortController | null>(null);
 
   // Sequence state
@@ -156,7 +158,7 @@ export default function CampaignEditor() {
     } as any);
   };
 
-  const generate = async () => {
+  const generate = async (extraNotes?: string) => {
     setGenerating(true);
     setAiBody("");
     setEditBody("");
@@ -165,6 +167,14 @@ export default function CampaignEditor() {
     setParsedEmails([]);
     setIsSequence(false);
     setActiveEmailIndex(0);
+
+    // If extra notes provided, append to campaign context_notes before generating
+    if (extraNotes && campaign) {
+      const existing = campaign.context_notes || "";
+      const merged = existing ? `${existing}\n\nNote aggiuntive: ${extraNotes}` : extraNotes;
+      await supabase.from("campaigns").update({ context_notes: merged }).eq("id", campaign.id);
+      setCampaign((c: any) => ({ ...c, context_notes: merged }));
+    }
 
     try {
       const controller = new AbortController();
@@ -377,10 +387,16 @@ export default function CampaignEditor() {
           <Input value={previewText} onChange={(e) => setPreviewText(e.target.value)} className="h-8 text-sm font-mono text-xs" />
         </div>
         <div className="flex items-center gap-2 pt-4">
-          <Button size="sm" variant="outline" onClick={generate} disabled={generating}>
+          <Button size="sm" variant="outline" onClick={() => generate()} disabled={generating}>
             <RefreshCw className={`mr-1 h-3 w-3 ${generating ? "animate-spin" : ""}`} />
             {generating ? "Generating..." : aiBody ? "Regenerate" : "Generate"}
           </Button>
+          {aiBody && !generating && (
+            <Button size="sm" variant="outline" onClick={() => setShowRefine(true)} className="text-destructive border-destructive/30 hover:bg-destructive/10">
+              <Trash2 className="mr-1 h-3 w-3" />
+              Scarta & Rifai
+            </Button>
+          )}
           {aiBody !== editBody && (
             <Button size="sm" variant="outline" onClick={handleMarkCorrection}>
               <Pencil className="mr-1 h-3 w-3" />
@@ -512,6 +528,40 @@ export default function CampaignEditor() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCorrection(false)}>Cancel</Button>
             <Button onClick={saveCorrection}>Save Correction</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Refine & Regenerate modal */}
+      <Dialog open={showRefine} onOpenChange={setShowRefine}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scarta e Rigenera</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              La mail attuale verrà scartata. Aggiungi dettagli per guidare la prossima generazione:
+            </p>
+            <Textarea
+              value={refineNotes}
+              onChange={(e) => setRefineNotes(e.target.value)}
+              placeholder="Es. Più focus sul prodotto X, tono più urgente, aggiungi scarcity, menziona la spedizione gratuita..."
+              className="min-h-[120px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRefine(false)}>Annulla</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setShowRefine(false);
+                generate(refineNotes || undefined);
+                setRefineNotes("");
+              }}
+            >
+              <Trash2 className="mr-1 h-3 w-3" />
+              Scarta & Rigenera
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
