@@ -62,6 +62,7 @@ function parseSequenceText(fullText: string): ParsedEmail[] {
 
 export default function CampaignEditor() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [campaign, setCampaign] = useState<any>(null);
   const [subjectLine, setSubjectLine] = useState("");
   const [previewText, setPreviewText] = useState("");
@@ -77,6 +78,9 @@ export default function CampaignEditor() {
   const [selectedNew, setSelectedNew] = useState("");
   const [showRefine, setShowRefine] = useState(false);
   const [refineNotes, setRefineNotes] = useState("");
+  const [showDuplicate, setShowDuplicate] = useState(false);
+  const [duplicateLanguage, setDuplicateLanguage] = useState("it");
+  const [duplicating, setDuplicating] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   // Sequence state
