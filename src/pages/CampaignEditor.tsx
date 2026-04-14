@@ -481,7 +481,7 @@ export default function CampaignEditor() {
           <EmailPreview
             subjectLine={subjectLine}
             previewText={previewText}
-            bodyMarkdown={aiBody}
+            bodyMarkdown={editBody}
             whatsappCopy={whatsapp}
             heroImageUrl={(campaign as any)?.hero_image_url}
             products={(campaign as any)?.products_data as any[] || []}
