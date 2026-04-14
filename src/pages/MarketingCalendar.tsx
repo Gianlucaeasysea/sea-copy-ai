@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -25,6 +26,7 @@ interface MarketingEvent {
   event_type: string;
   campaign_id: string | null;
   notes: string | null;
+  requires_email: boolean;
 }
 
 interface Campaign {
@@ -104,7 +106,7 @@ export default function MarketingCalendar() {
   const [formType, setFormType] = useState("promo");
   const [formNotes, setFormNotes] = useState("");
   const [formCampaignId, setFormCampaignId] = useState<string>("none");
-
+  const [formRequiresEmail, setFormRequiresEmail] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -164,6 +166,7 @@ export default function MarketingCalendar() {
     setFormType("promo");
     setFormNotes("");
     setFormCampaignId("none");
+    setFormRequiresEmail(false);
     setShowAdd(true);
   };
 
@@ -175,6 +178,7 @@ export default function MarketingCalendar() {
     setFormType(ev.event_type);
     setFormNotes(ev.notes || "");
     setFormCampaignId(ev.campaign_id || "none");
+    setFormRequiresEmail(ev.requires_email);
     setShowAdd(true);
   };
 
@@ -187,6 +191,7 @@ export default function MarketingCalendar() {
       event_type: formType,
       notes: formNotes.trim() || null,
       campaign_id: formCampaignId === "none" ? null : formCampaignId,
+      requires_email: formRequiresEmail,
     };
 
     if (editEvent) {
@@ -443,10 +448,12 @@ export default function MarketingCalendar() {
           </span>
         ))}
         <span className="flex items-center gap-1.5 ml-4">
-          <Check className="h-3 w-3 text-primary" /> Email scritta
+          <span className="inline-block h-3 w-5 rounded bg-emerald-100 ring-1 ring-emerald-400/50 dark:bg-emerald-900/30" />
+          <span>Email pronta</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <X className="h-3 w-3 text-destructive" /> Da scrivere
+          <span className="inline-block h-3 w-5 rounded bg-amber-100 ring-1 ring-amber-400/50 dark:bg-amber-900/30" />
+          <span>Email da scrivere</span>
         </span>
       </div>
 
@@ -522,22 +529,27 @@ export default function MarketingCalendar() {
                           {dayEvents.map((ev) => {
                             const camp = ev.campaign_id ? campaignMap[ev.campaign_id] : null;
                             const hasEmail = camp && (camp.status === "approved" || camp.subject_line);
+                            const needsEmail = ev.requires_email;
+                            // Determine background highlight for events needing email
+                            const emailBg = needsEmail
+                              ? hasEmail
+                                ? "bg-emerald-100 dark:bg-emerald-900/30 ring-1 ring-emerald-400/50"
+                                : "bg-amber-100 dark:bg-amber-900/30 ring-1 ring-amber-400/50"
+                              : "";
                             return (
                               <div
                                 key={ev.id}
-                                className="group flex items-center gap-1 px-1 py-0.5 rounded text-[11px] leading-tight hover:bg-background/80 transition-colors"
+                                className={`group flex items-center gap-1 px-1 py-0.5 rounded text-[11px] leading-tight hover:bg-background/80 transition-colors ${emailBg}`}
                                 onClick={(e) => { e.stopPropagation(); openEdit(ev); }}
                               >
                                 <span className={`h-2 w-2 rounded-full shrink-0 ${TYPE_COLORS[ev.event_type] || TYPE_COLORS.other}`} />
                                 <span className="truncate flex-1 font-medium">{ev.name}</span>
-                                {ev.campaign_id ? (
+                                {needsEmail && (
                                   hasEmail ? (
-                                    <Check className="h-3 w-3 text-primary shrink-0" />
+                                    <Check className="h-3 w-3 text-emerald-600 shrink-0" />
                                   ) : (
-                                    <span className="text-amber-500 text-[10px] shrink-0">draft</span>
+                                    <span className="text-amber-600 text-[10px] font-semibold shrink-0">✉</span>
                                   )
-                                ) : (
-                                  <X className="h-3 w-3 text-destructive/50 shrink-0" />
                                 )}
                               </div>
                             );
@@ -554,14 +566,22 @@ export default function MarketingCalendar() {
                   const colPercent = 100 / 7;
                   const left = bar.startCol * colPercent;
                   const width = bar.spanCols * colPercent;
-                  const top = 24 + lane * 22; // 24px offset for day number
+                  const top = 24 + lane * 22;
 
-                  const typeColor = TYPE_BG_COLORS[bar.event.event_type] || TYPE_BG_COLORS.other;
+                  const needsEmail = bar.event.requires_email;
+                  const camp = bar.event.campaign_id ? campaignMap[bar.event.campaign_id] : null;
+                  const hasEmail = camp && (camp.status === "approved" || camp.subject_line);
+                  // Use email status colors for multi-day bars that need email
+                  const barColor = needsEmail
+                    ? hasEmail
+                      ? "bg-emerald-500/90 text-white"
+                      : "bg-amber-500/90 text-white"
+                    : (TYPE_BG_COLORS[bar.event.event_type] || TYPE_BG_COLORS.other);
 
                   return (
                     <div
                       key={`${bar.event.id}-${weekRow}`}
-                      className={`absolute z-10 h-[18px] flex items-center cursor-pointer hover:opacity-90 transition-opacity ${typeColor} ${bar.isStart ? "rounded-l-md ml-1" : ""} ${bar.isEnd ? "rounded-r-md mr-1" : ""}`}
+                      className={`absolute z-10 h-[18px] flex items-center cursor-pointer hover:opacity-90 transition-opacity ${barColor} ${bar.isStart ? "rounded-l-md ml-1" : ""} ${bar.isEnd ? "rounded-r-md mr-1" : ""}`}
                       style={{
                         left: `${left}%`,
                         width: `calc(${width}% - ${(bar.isStart ? 4 : 0) + (bar.isEnd ? 4 : 0)}px)`,
@@ -635,6 +655,19 @@ export default function MarketingCalendar() {
             <div className="space-y-2">
               <Label>Note</Label>
               <Textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Dettagli opzionali…" className="min-h-[60px]" />
+            </div>
+            <div className="flex items-center gap-2 p-3 border rounded-lg">
+              <Checkbox
+                id="requires-email"
+                checked={formRequiresEmail}
+                onCheckedChange={(v) => setFormRequiresEmail(!!v)}
+              />
+              <Label htmlFor="requires-email" className="cursor-pointer">
+                Richiede email
+                <span className="text-xs text-muted-foreground block">
+                  L'evento verrà evidenziato nel calendario (verde = pronta, giallo = da scrivere)
+                </span>
+              </Label>
             </div>
           </div>
           <DialogFooter className="flex justify-between">
