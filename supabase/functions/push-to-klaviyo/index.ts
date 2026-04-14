@@ -142,6 +142,72 @@ ${productCardsHtml}
 </html>`;
 }
 
+function buildDarkBrandedHtml(campaign: any, fromName: string): string {
+  const bodyHtml = renderMarkdownToHtml(campaign.body_markdown || "", true);
+  const products: Product[] = Array.isArray(campaign.products_data) ? campaign.products_data : [];
+  const productCardsHtml = buildDarkProductCardsHtml(products);
+
+  const heroHtml = campaign.hero_image_url
+    ? `<tr><td><img src="${campaign.hero_image_url}" alt="Hero" width="600" style="display:block;width:100%;max-height:360px;object-fit:cover" /></td></tr>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+<title>${campaign.subject_line || campaign.name}</title>
+<style>
+  body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+  table,td{mso-table-lspace:0;mso-table-rspace:0}
+  img{-ms-interpolation-mode:bicubic;border:0;height:auto;line-height:100%;outline:none;text-decoration:none}
+  body{margin:0;padding:0;width:100%!important;background-color:#000000}
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#000000">
+<center>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#000000">
+<tr><td align="center" style="padding:20px 0">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#0a0a0a;border-radius:16px;overflow:hidden">
+
+<!-- Header -->
+<tr><td style="padding:20px 32px">
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td style="color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:800;font-size:20px;letter-spacing:-1px">easysea<span style="font-weight:400;font-size:14px;vertical-align:super;color:#999">®</span></td>
+<td align="right"><a href="https://www.easysea.org" style="font-family:Inter,Arial,sans-serif;font-size:12px;font-weight:500;color:#4355DB;text-decoration:none;letter-spacing:0.3px">easysea.org →</a></td>
+</tr></table>
+</td></tr>
+
+<!-- Blue accent line -->
+<tr><td style="padding:0 32px"><div style="height:2px;background:linear-gradient(90deg,#4355DB,transparent);border-radius:2px"></div></td></tr>
+
+${heroHtml}
+
+<!-- Body -->
+<tr><td style="padding:28px 32px 16px;font-family:Inter,Arial,sans-serif">
+${bodyHtml}
+${productCardsHtml}
+</td></tr>
+
+<!-- Footer -->
+<tr><td style="padding:20px 32px 24px;border-top:1px solid #222;text-align:center">
+<p style="font-family:Inter,Arial,sans-serif;font-size:11px;color:#555;margin:0;letter-spacing:0.5px">EASYSEA® · Beautiful and innovative nautical accessories</p>
+<p style="font-family:Inter,Arial,sans-serif;font-size:11px;color:#444;margin:8px 0 0">
+<a href="{{ unsubscribe_url }}" style="color:#555;text-decoration:underline">Unsubscribe</a>
+<span style="color:#333;margin:0 8px">·</span>
+<a href="https://www.easysea.org" style="color:#4355DB;text-decoration:none;font-weight:500">Visit easysea.org</a>
+</p>
+</td></tr>
+
+</table>
+</td></tr></table>
+</center>
+</body>
+</html>`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
