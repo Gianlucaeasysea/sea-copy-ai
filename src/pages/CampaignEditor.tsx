@@ -563,6 +563,13 @@ export default function CampaignEditor() {
             </button>
           </div>
         ))}
+        <Button size="sm" variant="outline" onClick={() => setHeroCreatorOpen(true)}>
+          <ImageIcon className="mr-1 h-3 w-3" />
+          {campaign.hero_image_url ? "Cambia hero" : "Crea hero image"}
+        </Button>
+        {campaign.hero_image_url && (
+          <img src={campaign.hero_image_url} alt="Hero" className="h-7 rounded border" />
+        )}
       </div>
 
       {/* Split view */}
