@@ -209,50 +209,55 @@ serve(async (req) => {
     const conversionMetricId = await findPlacedOrderMetricId(kHeaders);
     const kpiMap = await getFlowKPIs(kHeaders, conversionMetricId, activeTimeframe);
 
-    // 3. Enrich with action counts
-    const enrichedFlows = await Promise.all(
-      flows.map(async (flow: any) => {
-        try {
-          const actionsUrl = `https://a.klaviyo.com/api/flows/${flow.id}/flow-actions/?page[size]=50`;
-          const actionsRes = await fetch(actionsUrl, { headers: kHeaders });
-          if (!actionsRes.ok) {
-            console.warn(`flow-actions for ${flow.id} failed:`, actionsRes.status);
-          }
-          const actionsJson = actionsRes.ok ? await actionsRes.json() : { data: [] };
-          const actions: any[] = actionsJson.data || [];
-          if (actions.length > 0) {
-            console.log(`Flow ${flow.id} (${flow.attributes?.name}): ${actions.length} actions, types: ${actions.map((a: any) => a.attributes?.action_type).join(", ")}`);
-          }
-          return {
-            id:            flow.id,
-            name:          flow.attributes?.name || "Untitled",
-            status:        flow.attributes?.status || "unknown",
-            trigger_type:  flow.attributes?.trigger_type || "unknown",
-            archived:      flow.attributes?.archived || false,
-            created:       flow.attributes?.created,
-            updated:       flow.attributes?.updated,
-            email_count:   actions.filter((a: any) => a.attributes?.action_type === "send_email").length,
-            sms_count:     actions.filter((a: any) => a.attributes?.action_type === "send_sms").length,
-            total_actions: actions.length,
-            kpi:           kpiMap[flow.id] || null,
-          };
-        } catch {
-          return {
-            id:            flow.id,
-            name:          flow.attributes?.name || "Untitled",
-            status:        flow.attributes?.status || "unknown",
-            trigger_type:  flow.attributes?.trigger_type || "unknown",
-            archived:      flow.attributes?.archived || false,
-            created:       flow.attributes?.created,
-            updated:       flow.attributes?.updated,
-            email_count:   0,
-            sms_count:     0,
-            total_actions: 0,
-            kpi:           kpiMap[flow.id] || null,
-          };
+    // 3. Enrich with action counts (sequential to avoid 429 rate limits)
+    const enrichedFlows: any[] = [];
+    for (let fi = 0; fi < flows.length; fi++) {
+      const flow = flows[fi];
+      try {
+        const actionsUrl = `https://a.klaviyo.com/api/flows/${flow.id}/flow-actions/?page[size]=50`;
+        const actionsRes = await fetch(actionsUrl, { headers: kHeaders });
+        if (!actionsRes.ok) {
+          console.warn(`flow-actions for ${flow.id} failed:`, actionsRes.status);
         }
-      })
-    );
+        const actionsJson = actionsRes.ok ? await actionsRes.json() : { data: [] };
+        const actions: any[] = actionsJson.data || [];
+        const emailCount = actions.filter((a: any) =>
+          a.attributes?.action_type?.toLowerCase() === "send_email"
+        ).length;
+        const smsCount = actions.filter((a: any) =>
+          a.attributes?.action_type?.toLowerCase() === "send_sms"
+        ).length;
+        enrichedFlows.push({
+          id:            flow.id,
+          name:          flow.attributes?.name || "Untitled",
+          status:        flow.attributes?.status || "unknown",
+          trigger_type:  flow.attributes?.trigger_type || "unknown",
+          archived:      flow.attributes?.archived || false,
+          created:       flow.attributes?.created,
+          updated:       flow.attributes?.updated,
+          email_count:   emailCount,
+          sms_count:     smsCount,
+          total_actions: actions.length,
+          kpi:           kpiMap[flow.id] || null,
+        });
+      } catch {
+        enrichedFlows.push({
+          id:            flow.id,
+          name:          flow.attributes?.name || "Untitled",
+          status:        flow.attributes?.status || "unknown",
+          trigger_type:  flow.attributes?.trigger_type || "unknown",
+          archived:      flow.attributes?.archived || false,
+          created:       flow.attributes?.created,
+          updated:       flow.attributes?.updated,
+          email_count:   0,
+          sms_count:     0,
+          total_actions: 0,
+          kpi:           kpiMap[flow.id] || null,
+        });
+      }
+      // Rate limit: ~3 req/sec
+      if (fi < flows.length - 1) await new Promise((r) => setTimeout(r, 350));
+    }
 
     enrichedFlows.sort((a, b) => {
       if (a.status === "live" && b.status !== "live") return -1;
