@@ -210,7 +210,7 @@ serve(async (req) => {
     let audienceListId = listId;
     if (!audienceListId) {
       // Fetch first available list from Klaviyo
-      const listsRes = await fetch("https://a.klaviyo.com/api/lists/?page[size]=10", { headers });
+      const listsRes = await fetch("https://a.klaviyo.com/api/lists/", { headers });
       console.log("Klaviyo lists response status:", listsRes.status);
       if (listsRes.ok) {
         const listsData = await listsRes.json();
