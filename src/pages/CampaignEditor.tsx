@@ -379,7 +379,7 @@ export default function CampaignEditor() {
         <div className="flex items-center gap-2 pt-4">
           <Button size="sm" variant="outline" onClick={generate} disabled={generating}>
             <RefreshCw className={`mr-1 h-3 w-3 ${generating ? "animate-spin" : ""}`} />
-            {generating ? "Generating..." : "Regenerate"}
+            {generating ? "Generating..." : aiBody ? "Regenerate" : "Generate"}
           </Button>
           {aiBody !== editBody && (
             <Button size="sm" variant="outline" onClick={handleMarkCorrection}>
