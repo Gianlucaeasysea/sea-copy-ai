@@ -82,6 +82,8 @@ export default function CampaignEditor() {
   const [activeEmailIndex, setActiveEmailIndex] = useState(0);
   const [isSequence, setIsSequence] = useState(false);
 
+  const needsAutoGenerate = useRef(false);
+
   useEffect(() => {
     if (!id) return;
     const load = async () => {
@@ -101,10 +103,23 @@ export default function CampaignEditor() {
           setIsSequence(true);
           setActiveEmailIndex(0);
         }
+
+        // Auto-generate if campaign has no body yet
+        if (!data.body_markdown) {
+          needsAutoGenerate.current = true;
+        }
       }
     };
     load();
   }, [id]);
+
+  // Trigger auto-generation after campaign is loaded
+  useEffect(() => {
+    if (campaign && needsAutoGenerate.current) {
+      needsAutoGenerate.current = false;
+      generate();
+    }
+  }, [campaign]);
 
   const handleEmailTabChange = (index: number) => {
     setActiveEmailIndex(index);
