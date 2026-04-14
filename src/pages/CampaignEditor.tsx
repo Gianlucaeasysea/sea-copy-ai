@@ -451,6 +451,14 @@ export default function CampaignEditor() {
             <Send className="mr-1 h-3 w-3" />
             {pushingKlaviyo ? "Pushing..." : "→ Klaviyo"}
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { setDuplicateLanguage(campaign.language === "it" ? "en" : "it"); setShowDuplicate(true); }}
+          >
+            <Copy className="mr-1 h-3 w-3" />
+            Duplica
+          </Button>
         </div>
       </div>
 
