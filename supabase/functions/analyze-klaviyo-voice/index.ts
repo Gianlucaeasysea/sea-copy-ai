@@ -80,9 +80,10 @@ serve(async (req) => {
     const dateRangeStart = `${previousYear}-01-01`;
     const dateRangeEnd = today.toISOString().slice(0, 10);
 
+    const filterStr = `and(equals(messages.channel,'email'),equals(status,'Sent'),greater-or-equal(created_at,${dateFrom}))`;
     const firstUrl =
       "https://a.klaviyo.com/api/campaigns/" +
-      `?filter=and(equals(messages.channel,'email'),equals(status,'Sent'),greater-or-equal(updated_at,'${dateFrom}'))` +
+      `?filter=${encodeURIComponent(filterStr)}` +
       "&sort=-updated_at" +
       "&page[size]=50" +
       "&include=campaign-messages" +
