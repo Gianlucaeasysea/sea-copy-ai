@@ -1,0 +1,1 @@
+ALTER TABLE public.marketing_events ADD COLUMN requires_email boolean NOT NULL DEFAULT false;
