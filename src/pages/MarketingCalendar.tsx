@@ -566,14 +566,22 @@ export default function MarketingCalendar() {
                   const colPercent = 100 / 7;
                   const left = bar.startCol * colPercent;
                   const width = bar.spanCols * colPercent;
-                  const top = 24 + lane * 22; // 24px offset for day number
+                  const top = 24 + lane * 22;
 
-                  const typeColor = TYPE_BG_COLORS[bar.event.event_type] || TYPE_BG_COLORS.other;
+                  const needsEmail = bar.event.requires_email;
+                  const camp = bar.event.campaign_id ? campaignMap[bar.event.campaign_id] : null;
+                  const hasEmail = camp && (camp.status === "approved" || camp.subject_line);
+                  // Use email status colors for multi-day bars that need email
+                  const barColor = needsEmail
+                    ? hasEmail
+                      ? "bg-emerald-500/90 text-white"
+                      : "bg-amber-500/90 text-white"
+                    : (TYPE_BG_COLORS[bar.event.event_type] || TYPE_BG_COLORS.other);
 
                   return (
                     <div
                       key={`${bar.event.id}-${weekRow}`}
-                      className={`absolute z-10 h-[18px] flex items-center cursor-pointer hover:opacity-90 transition-opacity ${typeColor} ${bar.isStart ? "rounded-l-md ml-1" : ""} ${bar.isEnd ? "rounded-r-md mr-1" : ""}`}
+                      className={`absolute z-10 h-[18px] flex items-center cursor-pointer hover:opacity-90 transition-opacity ${barColor} ${bar.isStart ? "rounded-l-md ml-1" : ""} ${bar.isEnd ? "rounded-r-md mr-1" : ""}`}
                       style={{
                         left: `${left}%`,
                         width: `calc(${width}% - ${(bar.isStart ? 4 : 0) + (bar.isEnd ? 4 : 0)}px)`,
