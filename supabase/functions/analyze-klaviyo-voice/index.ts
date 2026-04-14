@@ -82,13 +82,12 @@ serve(async (req) => {
 
     const filterStr = `and(equals(messages.channel,'email'),equals(status,'Sent'),greater-or-equal(created_at,${dateFrom}))`;
     const firstUrl =
-      "https://a.klaviyo.com/api/campaigns/" +
-      `?filter=${encodeURIComponent(filterStr)}` +
+      `https://a.klaviyo.com/api/campaigns/?filter=${encodeURIComponent(filterStr)}` +
       "&sort=-updated_at" +
-      "&page[size]=50" +
+      `&page%5Bsize%5D=50` +
       "&include=campaign-messages" +
-      "&fields[campaign]=name,status,updated_at" +
-      "&fields[campaign-message]=content,channel,label";
+      `&fields%5Bcampaign%5D=name,status,updated_at` +
+      `&fields%5Bcampaign-message%5D=content,channel,label`;
 
     console.log("Starting Klaviyo full-history fetch from", dateFrom);
     const allPages = await fetchAllKlaviyoPages(firstUrl, klaviyoKey);
