@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import EmailPreview from "@/components/EmailPreview";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -166,29 +167,14 @@ export default function Library() {
               </CardHeader>
 
               {expanded === email.id && (
-                <CardContent className="pt-0 space-y-4">
-                  {email.preview_text && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Preview Text</p>
-                      <p className="text-sm text-muted-foreground italic">{email.preview_text}</p>
-                    </div>
-                  )}
-                  {email.body_markdown && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Email Body</p>
-                      <pre className="text-sm whitespace-pre-wrap font-mono bg-muted p-3 rounded-md overflow-auto max-h-96">
-                        {email.body_markdown}
-                      </pre>
-                    </div>
-                  )}
-                  {email.whatsapp_copy && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">WhatsApp</p>
-                      <pre className="text-sm whitespace-pre-wrap font-mono bg-muted p-3 rounded-md">
-                        {email.whatsapp_copy}
-                      </pre>
-                    </div>
-                  )}
+                <CardContent className="pt-0">
+                  <EmailPreview
+                    subjectLine={email.subject_line || ""}
+                    previewText={email.preview_text || ""}
+                    bodyMarkdown={email.body_markdown || ""}
+                    whatsappCopy={email.whatsapp_copy || ""}
+                    language={email.language || undefined}
+                  />
                 </CardContent>
               )}
             </Card>
