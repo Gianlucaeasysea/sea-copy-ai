@@ -10,20 +10,40 @@ type TimeframeKey = "last_7_days" | "last_30_days" | "last_90_days" | "last_365_
 
 // ── Find conversion metric ID ────────────────────────────────────────────────
 
-async function findPlacedOrderMetricId(kHeaders: Record<string, string>): Promise<string | null> {
+async function findConversionMetricId(kHeaders: Record<string, string>): Promise<string | null> {
   try {
     const res = await fetch(
       "https://a.klaviyo.com/api/metrics/?fields[metric]=name&page[size]=100",
       { headers: kHeaders }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn("metrics fetch failed:", res.status);
+      return null;
+    }
     const json = await res.json();
-    const match = (json.data || []).find((m: any) => {
+    const metrics = json.data || [];
+    console.log("Available metrics:", metrics.map((m: any) => `${m.id}: ${m.attributes?.name}`).join(", "));
+    
+    // Try "Placed Order" first
+    const placedOrder = metrics.find((m: any) => {
       const name = (m.attributes?.name || "").toLowerCase();
       return name.includes("placed order") || name.includes("ordine effettuato");
     });
-    return match?.id ?? null;
-  } catch {
+    if (placedOrder) {
+      console.log("Using conversion metric:", placedOrder.id, placedOrder.attributes?.name);
+      return placedOrder.id;
+    }
+    
+    // Fallback: use first available metric
+    if (metrics.length > 0) {
+      console.log("Fallback conversion metric:", metrics[0].id, metrics[0].attributes?.name);
+      return metrics[0].id;
+    }
+    
+    console.warn("No metrics found at all");
+    return null;
+  } catch (e) {
+    console.warn("findConversionMetricId error:", e);
     return null;
   }
 }
@@ -44,18 +64,24 @@ async function getFlowKPIs(
   conversionMetricId: string | null,
   timeframeKey: TimeframeKey
 ): Promise<Record<string, FlowKPI>> {
-  const statistics = ["opens", "open_rate", "clicks", "click_rate"];
-  if (conversionMetricId) statistics.push("attributed_revenue");
+  // conversion_metric_id is REQUIRED by Klaviyo API
+  if (!conversionMetricId) {
+    console.warn("No conversion metric ID available — cannot fetch KPIs");
+    return {};
+  }
+
+  const statistics = ["opens", "open_rate", "clicks", "click_rate", "attributed_revenue"];
 
   const payload: any = {
     data: {
       type: "flow-values-report",
-      attributes: { timeframe: { key: timeframeKey }, statistics },
+      attributes: {
+        timeframe: { key: timeframeKey },
+        statistics,
+        conversion_metric_id: conversionMetricId,
+      },
     },
   };
-  if (conversionMetricId) {
-    payload.data.attributes.conversion_metric_id = conversionMetricId;
-  }
 
   try {
     const res = await fetch("https://a.klaviyo.com/api/flow-values-reports/", {
