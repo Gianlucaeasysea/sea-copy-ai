@@ -105,7 +105,7 @@ export default function MarketingCalendar() {
   const [formType, setFormType] = useState("promo");
   const [formNotes, setFormNotes] = useState("");
   const [formCampaignId, setFormCampaignId] = useState<string>("none");
-
+  const [formRequiresEmail, setFormRequiresEmail] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -165,6 +165,7 @@ export default function MarketingCalendar() {
     setFormType("promo");
     setFormNotes("");
     setFormCampaignId("none");
+    setFormRequiresEmail(false);
     setShowAdd(true);
   };
 
@@ -176,6 +177,7 @@ export default function MarketingCalendar() {
     setFormType(ev.event_type);
     setFormNotes(ev.notes || "");
     setFormCampaignId(ev.campaign_id || "none");
+    setFormRequiresEmail(ev.requires_email);
     setShowAdd(true);
   };
 
@@ -188,6 +190,7 @@ export default function MarketingCalendar() {
       event_type: formType,
       notes: formNotes.trim() || null,
       campaign_id: formCampaignId === "none" ? null : formCampaignId,
+      requires_email: formRequiresEmail,
     };
 
     if (editEvent) {
