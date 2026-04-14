@@ -9,10 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X } from "lucide-react";
+import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X, ImageIcon } from "lucide-react";
 import EmailPreview from "@/components/EmailPreview";
 import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
 import ProductElementPicker, { ProductElements } from "@/components/ProductElementPicker";
+import HeroImageCreator from "@/components/HeroImageCreator";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -91,6 +92,7 @@ export default function CampaignEditor() {
   const [editorCollection, setEditorCollection] = useState<ShopifyCollection | null>(null);
   const [productElements, setProductElements] = useState<Record<string, ProductElements>>({});
   const [elementPickerProduct, setElementPickerProduct] = useState<ShopifyProduct | null>(null);
+  const [heroCreatorOpen, setHeroCreatorOpen] = useState(false);
 
   // Sequence state
   const [parsedEmails, setParsedEmails] = useState<ParsedEmail[]>([]);
@@ -561,6 +563,13 @@ export default function CampaignEditor() {
             </button>
           </div>
         ))}
+        <Button size="sm" variant="outline" onClick={() => setHeroCreatorOpen(true)}>
+          <ImageIcon className="mr-1 h-3 w-3" />
+          {campaign.hero_image_url ? "Cambia hero" : "Crea hero image"}
+        </Button>
+        {campaign.hero_image_url && (
+          <img src={campaign.hero_image_url} alt="Hero" className="h-7 rounded border" />
+        )}
       </div>
 
       {/* Split view */}
@@ -731,6 +740,16 @@ export default function CampaignEditor() {
           onConfirm={handleProductElementsConfirm}
         />
       )}
+
+      {/* Hero Image Creator */}
+      <HeroImageCreator
+        open={heroCreatorOpen}
+        onClose={() => setHeroCreatorOpen(false)}
+        onImageReady={async (url) => {
+          await supabase.from("campaigns").update({ hero_image_url: url } as any).eq("id", id);
+          setCampaign((c: any) => ({ ...c, hero_image_url: url }));
+        }}
+      />
     </div>
   );
 }
