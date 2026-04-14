@@ -210,10 +210,14 @@ serve(async (req) => {
 
     // 1. Fetch flows — NO sparse fieldsets so trigger_type is always returned
     const flowsRes = await fetch(
-      "https://a.klaviyo.com/api/flows/?sort=-updated_at&page[size]=50",
+      "https://a.klaviyo.com/api/flows/?page[size]=50&fields[flow]=name,status,created,updated,archived,trigger_type",
       { headers: kHeaders }
     );
-    if (!flowsRes.ok) throw new Error(`Klaviyo flows error: ${flowsRes.status}`);
+    if (!flowsRes.ok) {
+      const errBody = await flowsRes.text();
+      console.error("Klaviyo flows error:", flowsRes.status, errBody);
+      throw new Error(`Klaviyo flows error: ${flowsRes.status}`);
+    }
     const flowsJson = await flowsRes.json();
     const flows: any[] = flowsJson.data || [];
 
