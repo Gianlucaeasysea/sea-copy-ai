@@ -602,7 +602,7 @@ export default function CampaignEditor() {
             bodyMarkdown={editBody}
             whatsappCopy={whatsapp}
             heroImageUrl={(campaign as any)?.hero_image_url}
-            products={(campaign as any)?.products_data as any[] || []}
+            products={editorProducts.length > 0 ? editorProducts : ((campaign as any)?.products_data as any[] || [])}
             language={campaign?.language}
           />
         </div>
