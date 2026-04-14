@@ -419,6 +419,36 @@ export default function CampaignEditor() {
     }
   };
 
+  const handleProductsChange = async (products: ShopifyProduct[], collection: ShopifyCollection | null) => {
+    setEditorProducts(products);
+    setEditorCollection(collection);
+    const productsData = products.length > 0
+      ? products.map((p) => ({ ...p, elements: productElements[p.id] || null }))
+      : null;
+    await supabase.from("campaigns").update({
+      products_data: productsData as any,
+      collection_name: collection?.title || null,
+      hero_image_url: campaign.hero_image_url || products[0]?.image_url || null,
+    } as any).eq("id", id);
+    setCampaign((c: any) => ({
+      ...c,
+      products_data: productsData,
+      collection_name: collection?.title || null,
+      hero_image_url: c.hero_image_url || products[0]?.image_url || null,
+    }));
+    toast.success("Prodotti aggiornati!");
+  };
+
+  const handleProductElementsConfirm = async (elements: ProductElements) => {
+    const newElements = { ...productElements, [elements.product_id]: elements };
+    setProductElements(newElements);
+    // Update products_data with new elements
+    const productsData = editorProducts.map((p) => ({ ...p, elements: newElements[p.id] || null }));
+    await supabase.from("campaigns").update({ products_data: productsData as any } as any).eq("id", id);
+    setCampaign((c: any) => ({ ...c, products_data: productsData }));
+    toast.success("Dettagli prodotto aggiornati!");
+  };
+
   if (!campaign) return <div className="p-6 text-muted-foreground">Loading...</div>;
 
   return (
