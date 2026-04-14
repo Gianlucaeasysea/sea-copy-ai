@@ -20,6 +20,8 @@ interface EmailPreviewProps {
   heroImageUrl?: string | null;
   products?: Product[];
   language?: string;
+  branded?: boolean;
+  onBrandedChange?: (branded: boolean) => void;
 }
 
 /* ─── Brand tokens from easysea.org ─── */
