@@ -13,7 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
-  ChevronLeft, ChevronRight, Plus, Upload, Check, X, Pencil, Trash2, Link2,
+  ChevronLeft, ChevronRight, Plus, Upload, Check, X, Pencil, Trash2, Link2, ExternalLink, Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -82,6 +82,11 @@ export default function MarketingCalendar() {
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Notion import
+  const [notionUrl, setNotionUrl] = useState("");
+  const [notionLoading, setNotionLoading] = useState(false);
+  const [notionPreview, setNotionPreview] = useState<any[] | null>(null);
 
   const load = async () => {
     setLoading(true);
