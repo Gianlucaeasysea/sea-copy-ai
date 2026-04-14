@@ -197,10 +197,12 @@ export type Database = {
           campaign_name: string
           created_at: string
           framework: string | null
+          hero_image_url: string | null
           id: string
           language: string | null
           model_used: string | null
           preview_text: string | null
+          products_data: Json | null
           subject_line: string | null
           whatsapp_copy: string | null
         }
@@ -210,10 +212,12 @@ export type Database = {
           campaign_name: string
           created_at?: string
           framework?: string | null
+          hero_image_url?: string | null
           id?: string
           language?: string | null
           model_used?: string | null
           preview_text?: string | null
+          products_data?: Json | null
           subject_line?: string | null
           whatsapp_copy?: string | null
         }
@@ -223,10 +227,12 @@ export type Database = {
           campaign_name?: string
           created_at?: string
           framework?: string | null
+          hero_image_url?: string | null
           id?: string
           language?: string | null
           model_used?: string | null
           preview_text?: string | null
+          products_data?: Json | null
           subject_line?: string | null
           whatsapp_copy?: string | null
         }
