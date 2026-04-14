@@ -139,6 +139,56 @@ export type Database = {
           },
         ]
       }
+      generated_emails: {
+        Row: {
+          body_markdown: string | null
+          campaign_id: string | null
+          campaign_name: string
+          created_at: string
+          framework: string | null
+          id: string
+          language: string | null
+          model_used: string | null
+          preview_text: string | null
+          subject_line: string | null
+          whatsapp_copy: string | null
+        }
+        Insert: {
+          body_markdown?: string | null
+          campaign_id?: string | null
+          campaign_name: string
+          created_at?: string
+          framework?: string | null
+          id?: string
+          language?: string | null
+          model_used?: string | null
+          preview_text?: string | null
+          subject_line?: string | null
+          whatsapp_copy?: string | null
+        }
+        Update: {
+          body_markdown?: string | null
+          campaign_id?: string | null
+          campaign_name?: string
+          created_at?: string
+          framework?: string | null
+          id?: string
+          language?: string | null
+          model_used?: string | null
+          preview_text?: string | null
+          subject_line?: string | null
+          whatsapp_copy?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_emails_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
