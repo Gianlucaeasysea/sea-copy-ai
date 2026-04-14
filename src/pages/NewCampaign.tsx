@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowRight, Sparkles, Info, ShoppingBag, X } from "lucide-react";
 import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
+import ProductElementPicker, { ProductElements } from "@/components/ProductElementPicker";
 
 const FRAMEWORK_CONTEXT: Record<string, { tagline: string; whenToUse: string }> = {
   "AIDA": { tagline: "Il framework classico. Funziona sempre.", whenToUse: "Lancio prodotto, promo, newsletter con focus chiaro" },
@@ -20,16 +21,32 @@ const FRAMEWORK_CONTEXT: Record<string, { tagline: string; whenToUse: string }> 
   "StoryBrand": { tagline: "Il cliente è l'eroe. Tu sei la guida.", whenToUse: "Welcome, onboarding, brand storytelling" },
   "Feature-Benefit-Proof": { tagline: "Per prodotti tecnici. La struttura più onesta.", whenToUse: "Lancio prodotto tecnico, comparativi, clienti caldi" },
   "Plain Broadcast": { tagline: "Nessun framework. Solo comunicazione diretta.", whenToUse: "Aggiornamenti, annunci rapidi, newsletter leggere" },
+  "Welcome Series": { tagline: "5 email di onboarding. Trasforma un lead freddo in cliente.", whenToUse: "Nuovi iscritti newsletter" },
+  "Launch Sequence": { tagline: "4 email dal teaser al last call.", whenToUse: "Lancio prodotto nuovo o di ritorno" },
+  "Re-engagement": { tagline: "3 email per riattivare chi non compra da 90+ giorni.", whenToUse: "Lista fredda, segmento dormiente" },
+  "Post-Purchase": { tagline: "3 email post-acquisto. Rafforza la decisione, riduce i resi.", whenToUse: "Dopo ogni ordine" },
 };
+
+const FRAMEWORKS = [
+  // Single email
+  { value: "AIDA",                  label: "AIDA",                  emails: 1 },
+  { value: "PAS",                   label: "PAS",                   emails: 1 },
+  { value: "Before-After-Bridge",   label: "Before-After-Bridge",   emails: 1 },
+  { value: "4 Ps",                  label: "4 Ps",                  emails: 1 },
+  { value: "StoryBrand",            label: "StoryBrand",            emails: 1 },
+  { value: "Feature-Benefit-Proof", label: "Feature-Benefit-Proof", emails: 1 },
+  { value: "Plain Broadcast",       label: "Plain Broadcast",       emails: 1 },
+  // Multi-email sequences
+  { value: "SOAP Opera Sequence",   label: "SOAP Opera Sequence",   emails: 5 },
+  { value: "Welcome Series",        label: "Welcome Series",        emails: 5 },
+  { value: "Launch Sequence",       label: "Launch Sequence",       emails: 4 },
+  { value: "Re-engagement",         label: "Re-engagement",         emails: 3 },
+  { value: "Post-Purchase",         label: "Post-Purchase",         emails: 3 },
+];
 
 const campaignTypes = [
   "Product Launch", "Promo Weekend", "Newsletter", "Storytelling",
   "Abandoned Cart", "Welcome Series", "Announcement",
-];
-
-const frameworks = [
-  "AIDA", "PAS", "SOAP Opera Sequence", "Before-After-Bridge",
-  "4 Ps", "StoryBrand", "Feature-Benefit-Proof", "Plain Broadcast",
 ];
 
 const tones = ["Curiosity", "Urgency", "Benefit-led", "Story hook", "Direct"];
@@ -51,6 +68,8 @@ export default function NewCampaign() {
   const [selectedProducts, setSelectedProducts] = useState<ShopifyProduct[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<ShopifyCollection | null>(null);
   const [heroImageUrl, setHeroImageUrl] = useState("");
+  const [productElements, setProductElements] = useState<Record<string, ProductElements>>({});
+  const [elementPickerProduct, setElementPickerProduct] = useState<ShopifyProduct | null>(null);
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -69,7 +88,9 @@ export default function NewCampaign() {
       context_notes: form.context_notes || null,
       preview_text: form.preview_text,
       status: "draft",
-      products_data: selectedProducts.length > 0 ? selectedProducts as any : null,
+      products_data: selectedProducts.length > 0
+        ? selectedProducts.map((p) => ({ ...p, elements: productElements[p.id] || null })) as any
+        : null,
       collection_name: selectedCollection?.title || null,
       hero_image_url: heroImageUrl || selectedProducts[0]?.image_url || null,
     } as any).select().single();
@@ -125,7 +146,23 @@ export default function NewCampaign() {
                 <Label>Email Framework</Label>
                 <Select value={form.framework} onValueChange={(v) => update("framework", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{frameworks.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    <div className="px-2 py-1 text-xs text-muted-foreground font-medium">Singola email</div>
+                    {FRAMEWORKS.filter((f) => f.emails === 1).map((f) => (
+                      <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                    ))}
+                    <div className="px-2 py-1 text-xs text-muted-foreground font-medium mt-1 border-t pt-2">Sequenze multi-email</div>
+                    {FRAMEWORKS.filter((f) => f.emails > 1).map((f) => (
+                      <SelectItem key={f.value} value={f.value}>
+                        <span className="flex items-center gap-2">
+                          {f.label}
+                          <span className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-medium">
+                            {f.emails} email
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
                 {FRAMEWORK_CONTEXT[form.framework] && (
                   <div className="flex items-start gap-2 p-2.5 bg-muted/50 rounded-md border border-dashed">
@@ -189,6 +226,12 @@ export default function NewCampaign() {
                       )}
                       <span className="text-xs">{p.title}</span>
                       <button
+                        onClick={() => setElementPickerProduct(p)}
+                        className="text-xs text-primary underline ml-1"
+                      >
+                        {productElements[p.id] ? "✓ elementi" : "dettagli"}
+                      </button>
+                      <button
                         onClick={() => setSelectedProducts((prev) => prev.filter((x) => x.id !== p.id))}
                         className="text-muted-foreground hover:text-foreground"
                       >
@@ -197,6 +240,18 @@ export default function NewCampaign() {
                     </div>
                   ))}
                 </div>
+              )}
+
+              {elementPickerProduct && (
+                <ProductElementPicker
+                  open={!!elementPickerProduct}
+                  onClose={() => setElementPickerProduct(null)}
+                  productId={elementPickerProduct.id}
+                  productTitle={elementPickerProduct.title}
+                  onConfirm={(elements) => {
+                    setProductElements((prev) => ({ ...prev, [elementPickerProduct.id]: elements }));
+                  }}
+                />
               )}
 
               <ProductPicker

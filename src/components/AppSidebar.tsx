@@ -1,4 +1,4 @@
-import { LayoutDashboard, PlusCircle, BookOpen, Library, HelpCircle, Settings, Sparkles, CalendarDays } from "lucide-react";
+import { LayoutDashboard, PlusCircle, BookOpen, Library, HelpCircle, Settings, Sparkles, CalendarDays, Workflow } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -17,6 +17,7 @@ const items = [
   { title: "New Campaign", url: "/new-campaign", icon: PlusCircle },
   { title: "Calendario", url: "/calendar", icon: CalendarDays },
   { title: "Library", url: "/library", icon: Library },
+  { title: "Klaviyo Flows", url: "/flows", icon: Workflow },
   { title: "Corrections", url: "/corrections", icon: BookOpen },
   { title: "Guide", url: "/guide", icon: HelpCircle },
   { title: "Brand Settings", url: "/settings", icon: Settings },
