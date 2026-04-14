@@ -13,6 +13,7 @@ import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X } fr
 import EmailPreview from "@/components/EmailPreview";
 import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
 import ProductElementPicker, { ProductElements } from "@/components/ProductElementPicker";
+import HeroImageCreator from "@/components/HeroImageCreator";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
