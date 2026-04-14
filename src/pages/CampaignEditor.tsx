@@ -338,7 +338,7 @@ export default function CampaignEditor() {
     setPushingKlaviyo(true);
     try {
       const { data, error } = await supabase.functions.invoke("push-to-klaviyo", {
-        body: { campaign_id: campaign.id },
+        body: { campaign_id: campaign.id, branded_style: brandedStyle },
       });
       if (error) throw error;
       if (data?.klaviyo_url) {
