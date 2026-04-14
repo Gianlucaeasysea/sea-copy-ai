@@ -6,7 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+type TimeframeKey = "last_7_days" | "last_30_days" | "last_90_days" | "last_365_days" | "this_year";
+
+// ── Find conversion metric ID ────────────────────────────────────────────────
 
 async function findPlacedOrderMetricId(kHeaders: Record<string, string>): Promise<string | null> {
   try {
@@ -16,16 +18,17 @@ async function findPlacedOrderMetricId(kHeaders: Record<string, string>): Promis
     );
     if (!res.ok) return null;
     const json = await res.json();
-    const match = (json.data || []).find(
-      (m: any) =>
-        m.attributes?.name?.toLowerCase().includes("placed order") ||
-        m.attributes?.name?.toLowerCase().includes("ordine effettuato")
-    );
-    return match?.id || null;
+    const match = (json.data || []).find((m: any) => {
+      const name = (m.attributes?.name || "").toLowerCase();
+      return name.includes("placed order") || name.includes("ordine effettuato");
+    });
+    return match?.id ?? null;
   } catch {
     return null;
   }
 }
+
+// ── KPIs via flow-values-reports ─────────────────────────────────────────────
 
 interface FlowKPI {
   opens: number | null;
@@ -33,69 +36,83 @@ interface FlowKPI {
   clicks: number | null;
   click_rate: number | null;
   revenue: number | null;
+  source: string;
 }
-
-type TimeframeKey = "last_7_days" | "last_30_days" | "last_90_days" | "last_365_days" | "this_year";
 
 async function getFlowKPIs(
   kHeaders: Record<string, string>,
   conversionMetricId: string | null,
-  timeframeKey: TimeframeKey = "last_30_days"
+  timeframeKey: TimeframeKey
 ): Promise<Record<string, FlowKPI>> {
+  const statistics = ["opens", "open_rate", "clicks", "click_rate"];
+  if (conversionMetricId) statistics.push("attributed_revenue");
+
+  const payload: any = {
+    data: {
+      type: "flow-values-report",
+      attributes: { timeframe: { key: timeframeKey }, statistics },
+    },
+  };
+  if (conversionMetricId) {
+    payload.data.attributes.conversion_metric_id = conversionMetricId;
+  }
+
   try {
-    // conversion_metric_id is required by Klaviyo API
-    if (!conversionMetricId) {
-      console.warn("No conversion metric found — skipping KPI fetch");
-      return {};
-    }
-
-    const statistics = ["opens", "open_rate", "clicks", "click_rate", "attributed_revenue"];
-
-    const payload: any = {
-      data: {
-        type: "flow-values-report",
-        attributes: {
-          timeframe: { key: timeframeKey },
-          statistics,
-          conversion_metric_id: conversionMetricId,
-        },
-      },
-    };
-
     const res = await fetch("https://a.klaviyo.com/api/flow-values-reports/", {
       method: "POST",
       headers: { ...kHeaders, "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) {
-      console.warn("flow-values-reports failed:", res.status, await res.text());
-      return {};
-    }
+    const rawText = await res.text();
+    console.log("flow-values-reports status:", res.status);
+    console.log("flow-values-reports body (first 500):", rawText.slice(0, 500));
 
-    const json = await res.json();
-    const results: any[] = json.data?.attributes?.results || [];
+    if (!res.ok) return {};
+
+    let json: any;
+    try { json = JSON.parse(rawText); } catch { return {}; }
+
+    const results: any[] =
+      json.data?.attributes?.results ||
+      json.results ||
+      [];
 
     const kpiMap: Record<string, FlowKPI> = {};
     for (const r of results) {
       const flowId =
-        r.group_by?.find((g: any) => g.type === "flow_id" || g.type === "flow")?.value ||
+        r.group_by?.find((g: any) =>
+          g.type === "flow_id" || g.type === "flow" || g.type === "Flow"
+        )?.value ||
+        r.flow_id ||
         r.id;
+
       if (!flowId) continue;
+
       kpiMap[flowId] = {
-        opens:      r.statistics?.opens       ?? null,
-        open_rate:  r.statistics?.open_rate   ?? null,
-        clicks:     r.statistics?.clicks      ?? null,
-        click_rate: r.statistics?.click_rate  ?? null,
-        revenue:    r.statistics?.attributed_revenue ?? r.statistics?.revenue ?? null,
+        opens:      r.statistics?.opens       ?? r.opens       ?? null,
+        open_rate:  r.statistics?.open_rate   ?? r.open_rate   ?? null,
+        clicks:     r.statistics?.clicks      ?? r.clicks      ?? null,
+        click_rate: r.statistics?.click_rate  ?? r.click_rate  ?? null,
+        revenue:
+          r.statistics?.attributed_revenue ??
+          r.statistics?.revenue            ??
+          r.attributed_revenue             ??
+          r.revenue                        ??
+          null,
+        source: "flow-values-reports",
       };
     }
+
+    console.log("KPI map keys:", Object.keys(kpiMap).length);
     return kpiMap;
   } catch (e) {
     console.warn("getFlowKPIs error:", e);
     return {};
   }
 }
+
+// ── Lazy-load email subjects for one flow ────────────────────────────────────
 
 interface FlowEmail {
   position: number;
@@ -111,8 +128,7 @@ async function getFlowEmails(
   kHeaders: Record<string, string>
 ): Promise<FlowEmail[]> {
   const actionsRes = await fetch(
-    `https://a.klaviyo.com/api/flows/${flowId}/flow-actions/` +
-      `?fields[flow-action]=action_type,status&page[size]=25`,
+    `https://a.klaviyo.com/api/flows/${flowId}/flow-actions/?page[size]=25`,
     { headers: kHeaders }
   );
   if (!actionsRes.ok) return [];
@@ -127,8 +143,7 @@ async function getFlowEmails(
     const action = emailActions[i];
     try {
       const msgRes = await fetch(
-        `https://a.klaviyo.com/api/flow-actions/${action.id}/messages/` +
-          `?fields[flow-message]=label,content&page[size]=1`,
+        `https://a.klaviyo.com/api/flow-actions/${action.id}/messages/?page[size]=1`,
         { headers: kHeaders }
       );
       if (msgRes.ok) {
@@ -139,21 +154,22 @@ async function getFlowEmails(
             position:      i + 1,
             action_id:     action.id,
             action_status: action.attributes?.status || "unknown",
-            subject:       msg.attributes?.content?.subject || msg.attributes?.label || "(nessun subject)",
-            preview_text:  msg.attributes?.content?.preview_text || "",
-            label:         msg.attributes?.label || `Email ${i + 1}`,
+            subject:
+              msg.attributes?.content?.subject ||
+              msg.attributes?.label            ||
+              "(nessun subject)",
+            preview_text: msg.attributes?.content?.preview_text || "",
+            label:        msg.attributes?.label || `Email ${i + 1}`,
           });
         }
       }
-    } catch {
-      // skip
-    }
+    } catch { /* skip */ }
     if (i < emailActions.length - 1) await new Promise((r) => setTimeout(r, 220));
   }
   return emails;
 }
 
-// ── main handler ─────────────────────────────────────────────────────────────
+// ── Main handler ─────────────────────────────────────────────────────────────
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -171,7 +187,7 @@ serve(async (req) => {
     settingsRows?.forEach((r: any) => { settings[r.key] = r.value; });
 
     const klaviyoKey = settings.klaviyo_api_key;
-    if (!klaviyoKey) throw new Error("Klaviyo API key not configured");
+    if (!klaviyoKey) throw new Error("Klaviyo API key not configured in Brand Settings");
 
     const kHeaders: Record<string, string> = {
       Authorization: `Klaviyo-API-Key ${klaviyoKey}`,
@@ -179,7 +195,7 @@ serve(async (req) => {
       Accept: "application/json",
     };
 
-    // ── MODE 2: lazy-load emails for a specific flow ─────────────────────────
+    // ── MODE 2: lazy email list for a specific flow ──────────────────────────
     if (flow_id) {
       const emails = await getFlowEmails(flow_id, kHeaders);
       return new Response(
@@ -192,16 +208,12 @@ serve(async (req) => {
 
     const activeTimeframe: TimeframeKey = timeframe || "last_30_days";
 
-    // 1. Fetch flows (removed sort and trigger_type to avoid Klaviyo 400 errors)
+    // 1. Fetch flows — NO sparse fieldsets so trigger_type is always returned
     const flowsRes = await fetch(
-      "https://a.klaviyo.com/api/flows/?page[size]=50&fields[flow]=name,status,created,updated,archived",
+      "https://a.klaviyo.com/api/flows/?sort=-updated_at&page[size]=50",
       { headers: kHeaders }
     );
-    if (!flowsRes.ok) {
-      const errBody = await flowsRes.text();
-      console.error("Klaviyo flows error:", flowsRes.status, errBody);
-      throw new Error(`Klaviyo flows error: ${flowsRes.status}`);
-    }
+    if (!flowsRes.ok) throw new Error(`Klaviyo flows error: ${flowsRes.status}`);
     const flowsJson = await flowsRes.json();
     const flows: any[] = flowsJson.data || [];
 
@@ -209,67 +221,60 @@ serve(async (req) => {
     const conversionMetricId = await findPlacedOrderMetricId(kHeaders);
     const kpiMap = await getFlowKPIs(kHeaders, conversionMetricId, activeTimeframe);
 
-    // 3. Enrich with action counts (batches of 3 to avoid 429 rate limits)
-    async function fetchActions(flow: any) {
-      const isActive = !flow.attributes?.archived &&
-        (flow.attributes?.status === "live" || flow.attributes?.status === "draft" || flow.attributes?.status === "manual");
-      if (!isActive) {
-        return {
-          id: flow.id, name: flow.attributes?.name || "Untitled",
-          status: flow.attributes?.status || "unknown",
-          trigger_type: flow.attributes?.trigger_type || "unknown",
-          archived: flow.attributes?.archived || false,
-          created: flow.attributes?.created, updated: flow.attributes?.updated,
-          email_count: 0, sms_count: 0, total_actions: 0,
-          kpi: kpiMap[flow.id] || null,
-        };
-      }
-      try {
-        const res = await fetch(
-          `https://a.klaviyo.com/api/flows/${flow.id}/flow-actions/?page[size]=50`,
-          { headers: kHeaders }
-        );
-        const json = res.ok ? await res.json() : { data: [] };
-        const actions: any[] = json.data || [];
-        return {
-          id: flow.id, name: flow.attributes?.name || "Untitled",
-          status: flow.attributes?.status || "unknown",
-          trigger_type: flow.attributes?.trigger_type || "unknown",
-          archived: false, created: flow.attributes?.created, updated: flow.attributes?.updated,
-          email_count: actions.filter((a: any) => a.attributes?.action_type?.toLowerCase() === "send_email").length,
-          sms_count: actions.filter((a: any) => a.attributes?.action_type?.toLowerCase() === "send_sms").length,
-          total_actions: actions.length,
-          kpi: kpiMap[flow.id] || null,
-        };
-      } catch {
-        return {
-          id: flow.id, name: flow.attributes?.name || "Untitled",
-          status: flow.attributes?.status || "unknown",
-          trigger_type: flow.attributes?.trigger_type || "unknown",
-          archived: false, created: flow.attributes?.created, updated: flow.attributes?.updated,
-          email_count: 0, sms_count: 0, total_actions: 0,
-          kpi: kpiMap[flow.id] || null,
-        };
-      }
-    }
+    // 3. Enrich with action counts + KPIs
+    const enrichedFlows = await Promise.all(
+      flows.map(async (flow: any) => {
+        try {
+          const actionsRes = await fetch(
+            `https://a.klaviyo.com/api/flows/${flow.id}/flow-actions/?page[size]=25`,
+            { headers: kHeaders }
+          );
+          const actionsJson = actionsRes.ok ? await actionsRes.json() : { data: [] };
+          const actions: any[] = actionsJson.data || [];
 
-    const enrichedFlows: any[] = [];
-    const BATCH = 3;
-    for (let i = 0; i < flows.length; i += BATCH) {
-      const batch = flows.slice(i, i + BATCH);
-      const results = await Promise.all(batch.map(fetchActions));
-      enrichedFlows.push(...results);
-      if (i + BATCH < flows.length) await new Promise((r) => setTimeout(r, 400));
-    }
+          return {
+            id:            flow.id,
+            name:          flow.attributes?.name          || "Untitled",
+            status:        flow.attributes?.status        || "unknown",
+            trigger_type:  flow.attributes?.trigger_type  || null,
+            archived:      flow.attributes?.archived       || false,
+            created:       flow.attributes?.created,
+            updated:       flow.attributes?.updated,
+            email_count:   actions.filter((a: any) => a.attributes?.action_type === "send_email").length,
+            sms_count:     actions.filter((a: any) => a.attributes?.action_type === "send_sms").length,
+            total_actions: actions.length,
+            kpi:           kpiMap[flow.id] ?? null,
+            kpi_available: Object.keys(kpiMap).length > 0,
+          };
+        } catch {
+          return {
+            id:            flow.id,
+            name:          flow.attributes?.name   || "Untitled",
+            status:        flow.attributes?.status || "unknown",
+            trigger_type:  flow.attributes?.trigger_type || null,
+            archived:      flow.attributes?.archived || false,
+            created:       flow.attributes?.created,
+            updated:       flow.attributes?.updated,
+            email_count: 0, sms_count: 0, total_actions: 0,
+            kpi: kpiMap[flow.id] ?? null,
+            kpi_available: Object.keys(kpiMap).length > 0,
+          };
+        }
+      })
+    );
 
     enrichedFlows.sort((a, b) => {
       if (a.status === "live" && b.status !== "live") return -1;
       if (b.status === "live" && a.status !== "live") return 1;
-      return new Date(b.updated).getTime() - new Date(a.updated).getTime();
+      return new Date(b.updated || 0).getTime() - new Date(a.updated || 0).getTime();
     });
 
     return new Response(
-      JSON.stringify({ flows: enrichedFlows, timeframe: activeTimeframe }),
+      JSON.stringify({
+        flows: enrichedFlows,
+        timeframe: activeTimeframe,
+        kpi_available: Object.keys(kpiMap).length > 0,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
