@@ -221,6 +221,44 @@ export default function MarketingCalendar() {
     load();
   };
 
+  // Notion import
+  const fetchNotion = async () => {
+    if (!notionUrl.trim()) return;
+    setNotionLoading(true);
+    setNotionPreview(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("import-notion-events", {
+        body: { notion_url: notionUrl.trim() },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const events = data?.events || [];
+      if (!events.length) { toast.error("Nessun evento trovato nella pagina"); return; }
+      setNotionPreview(events);
+    } catch (err: any) {
+      toast.error("Errore: " + (err.message || "Import fallito"));
+    } finally {
+      setNotionLoading(false);
+    }
+  };
+
+  const confirmNotionImport = async () => {
+    if (!notionPreview?.length) return;
+    const rows = notionPreview.map((e: any) => ({
+      name: e.name,
+      event_date: e.event_date,
+      event_type: e.event_type || "other",
+      notes: e.notes || null,
+    }));
+    const { error } = await supabase.from("marketing_events").insert(rows as any);
+    if (error) { toast.error("Insert failed"); return; }
+    toast.success(`${rows.length} eventi importati da Notion`);
+    setShowImport(false);
+    setNotionUrl("");
+    setNotionPreview(null);
+    load();
+  };
+
   // Calendar grid
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfWeek(viewYear, viewMonth);
