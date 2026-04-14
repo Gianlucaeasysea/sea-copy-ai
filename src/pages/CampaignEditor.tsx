@@ -713,6 +713,24 @@ export default function CampaignEditor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Product Picker modal */}
+      <ProductPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selectedProducts={editorProducts}
+        onSelect={handleProductsChange}
+      />
+
+      {/* Product Element Picker modal */}
+      {elementPickerProduct && (
+        <ProductElementPicker
+          open={!!elementPickerProduct}
+          onClose={() => setElementPickerProduct(null)}
+          productId={elementPickerProduct.id}
+          productTitle={elementPickerProduct.title}
+          onConfirm={handleProductElementsConfirm}
+        />
+      )}
     </div>
   );
 }
