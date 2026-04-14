@@ -7,11 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Sparkles, Zap } from "lucide-react";
+import { Save, Sparkles, Zap, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 
 export default function BrandSettings() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [lastAnalysis, setLastAnalysis] = useState<{
+    campaigns_analyzed: number;
+    analyzed_at: string;
+    date_range_start: string;
+    date_range_end: string;
+  } | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -19,6 +26,16 @@ export default function BrandSettings() {
       const map: Record<string, string> = {};
       data?.forEach((row: any) => { map[row.key] = row.value; });
       setSettings(map);
+
+      const { data: analysis } = await supabase
+        .from("brand_voice_analysis" as any)
+        .select("campaigns_analyzed, analyzed_at, date_range_start, date_range_end")
+        .eq("is_active", true)
+        .order("analyzed_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (analysis) setLastAnalysis(analysis as any);
+
       setLoading(false);
     };
     load();
@@ -29,12 +46,31 @@ export default function BrandSettings() {
 
   const save = async () => {
     const upserts = Object.entries(settings).map(([key, value]) =>
-      supabase
-        .from("brand_settings")
-        .upsert({ key, value }, { onConflict: "key" })
+      supabase.from("brand_settings").upsert({ key, value }, { onConflict: "key" })
     );
     await Promise.all(upserts);
     toast.success("Settings saved!");
+  };
+
+  const handleAnalyzeKlaviyo = async () => {
+    setAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-klaviyo-voice");
+      if (error) throw error;
+      toast.success(
+        `Analisi completata — ${data.campaigns_analyzed} campagne analizzate (${data.date_range}).`
+      );
+      setLastAnalysis({
+        campaigns_analyzed: data.campaigns_analyzed,
+        analyzed_at: new Date().toISOString(),
+        date_range_start: data.date_range.split(" → ")[0],
+        date_range_end: data.date_range.split(" → ")[1],
+      });
+    } catch (e: any) {
+      toast.error("Analisi fallita: " + (e?.message || "errore sconosciuto"));
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const hasClaudeKey = !!settings.claude_api_key;
@@ -47,22 +83,81 @@ export default function BrandSettings() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Brand Settings</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Configure easysea® brand voice and integrations
+            Configura voce del brand e integrazioni easysea®
           </p>
         </div>
         <Button onClick={save}>
-          <Save className="mr-2 h-4 w-4" /> Save Settings
+          <Save className="mr-2 h-4 w-4" /> Salva
         </Button>
       </div>
 
-      {/* AI Model status banner */}
+      {/* Brand Voice Analysis from Klaviyo */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Brand Voice da Klaviyo</CardTitle>
+          <CardDescription>
+            Scarica tutte le campagne email inviate nell'anno corrente e in quello precedente.
+            Analizza subject line, hook, CTA, vocabolario e ritmo con esempi reali.
+            Il risultato viene iniettato in ogni generazione AI.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {lastAnalysis ? (
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-teal-50 border border-teal-200">
+              <CheckCircle2 className="h-5 w-5 text-teal-600 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-teal-800">
+                  Analisi attiva — {lastAnalysis.campaigns_analyzed} campagne
+                </p>
+                <p className="text-xs text-teal-600">
+                  Periodo: {lastAnalysis.date_range_start} → {lastAnalysis.date_range_end}
+                </p>
+                <p className="text-xs text-teal-500">
+                  Aggiornata il{" "}
+                  {new Date(lastAnalysis.analyzed_at).toLocaleString("it-IT", {
+                    day: "2-digit", month: "short", year: "numeric",
+                    hour: "2-digit", minute: "2-digit",
+                  })}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800">
+                Nessuna analisi ancora. L'AI usa la descrizione generica finché non esegui l'analisi.
+              </p>
+            </div>
+          )}
+          <Button
+            onClick={handleAnalyzeKlaviyo}
+            disabled={analyzing || !settings.klaviyo_api_key}
+            className="w-full"
+            variant={lastAnalysis ? "outline" : "default"}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${analyzing ? "animate-spin" : ""}`} />
+            {analyzing
+              ? "Analisi in corso… (1–3 minuti)"
+              : lastAnalysis
+              ? "Rianalizza campagne Klaviyo"
+              : "Analizza campagne Klaviyo"}
+          </Button>
+          {!settings.klaviyo_api_key && (
+            <p className="text-xs text-muted-foreground text-center">
+              Aggiungi la Klaviyo API key nella sezione Klaviyo per abilitare questa funzione.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* AI Model status */}
       <div className={`flex items-center gap-3 p-4 rounded-lg border ${hasClaudeKey ? "bg-teal-50 border-teal-200" : "bg-muted border-border"}`}>
         {hasClaudeKey ? (
           <>
             <Sparkles className="h-5 w-5 text-teal-600 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-teal-800">Claude Sonnet active</p>
-              <p className="text-xs text-teal-600">Copy generation uses your Anthropic API key</p>
+              <p className="text-sm font-medium text-teal-800">Claude Sonnet attivo</p>
+              <p className="text-xs text-teal-600">La generazione usa la tua Anthropic API key</p>
             </div>
             <Badge className="ml-auto bg-teal-600">Claude</Badge>
           </>
@@ -70,33 +165,35 @@ export default function BrandSettings() {
           <>
             <Zap className="h-5 w-5 text-muted-foreground shrink-0" />
             <div>
-              <p className="text-sm font-medium">Gemini Flash active (default)</p>
-              <p className="text-xs text-muted-foreground">Add a Claude API key below to switch to higher-quality generation</p>
+              <p className="text-sm font-medium">Gemini Flash attivo (default)</p>
+              <p className="text-xs text-muted-foreground">Aggiungi una Claude API key per qualità superiore</p>
             </div>
             <Badge variant="secondary" className="ml-auto">Gemini</Badge>
           </>
         )}
       </div>
 
-      {/* Brand Voice */}
+      {/* Brand Voice (fallback) */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Brand Voice</CardTitle>
-          <CardDescription>Injected into every AI prompt</CardDescription>
+          <CardTitle className="text-lg">Brand Voice (fallback)</CardTitle>
+          <CardDescription>
+            Usato solo se l'analisi Klaviyo non è ancora stata eseguita
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Brand Voice Description</Label>
+            <Label>Descrizione brand voice</Label>
             <Textarea
               value={settings.brand_voice || ""}
               onChange={(e) => update("brand_voice", e.target.value)}
               rows={4}
-              placeholder="Energetic, direct, technical but accessible. No fluff. Sailors talk to sailors."
+              placeholder="Energico, diretto, tecnico ma accessibile. Niente fluff. Marinai che parlano a marinai."
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Persona Fallback</Label>
+              <Label>Persona fallback</Label>
               <Input
                 value={settings.persona_fallback || ""}
                 onChange={(e) => update("persona_fallback", e.target.value)}
@@ -104,7 +201,7 @@ export default function BrandSettings() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Default Language</Label>
+              <Label>Lingua default</Label>
               <Input
                 value={settings.default_language || ""}
                 onChange={(e) => update("default_language", e.target.value)}
@@ -113,7 +210,7 @@ export default function BrandSettings() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Excluded Shopify Tags (comma-separated)</Label>
+            <Label>Tag Shopify esclusi (separati da virgola)</Label>
             <Input
               value={settings.excluded_tags || ""}
               onChange={(e) => update("excluded_tags", e.target.value)}
@@ -126,14 +223,14 @@ export default function BrandSettings() {
       {/* AI */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">AI Model</CardTitle>
+          <CardTitle className="text-lg">Modello AI</CardTitle>
           <CardDescription>
-            Leave blank to use Gemini (free, included). Add your Anthropic key to use Claude Sonnet.
+            Lascia vuoto per usare Gemini (gratuito, incluso). Aggiungi la chiave Anthropic per Claude Sonnet.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <div className="space-y-2">
-            <Label>Claude API Key (optional)</Label>
+            <Label>Claude API Key (opzionale)</Label>
             <Input
               type="password"
               value={settings.claude_api_key || ""}
@@ -141,7 +238,7 @@ export default function BrandSettings() {
               placeholder="sk-ant-..."
             />
             <p className="text-xs text-muted-foreground">
-              Get your key at console.anthropic.com. Using Claude Sonnet incurs Anthropic API costs.
+              Ottieni la chiave su console.anthropic.com. L'uso di Claude Sonnet ha un costo Anthropic.
             </p>
           </div>
         </CardContent>
@@ -151,7 +248,9 @@ export default function BrandSettings() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Klaviyo</CardTitle>
-          <CardDescription>Required to push campaigns directly to Klaviyo as drafts</CardDescription>
+          <CardDescription>
+            Necessario per l'analisi del brand voice e per il push delle campagne come draft
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -188,7 +287,7 @@ export default function BrandSettings() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Shopify</CardTitle>
-          <CardDescription>Used to pull product data into campaigns</CardDescription>
+          <CardDescription>Per importare prodotti nelle campagne</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -197,7 +296,7 @@ export default function BrandSettings() {
               <Input
                 value={settings.shopify_store_url || ""}
                 onChange={(e) => update("shopify_store_url", e.target.value)}
-                placeholder="your-store.myshopify.com"
+                placeholder="easysea-design-lab.myshopify.com"
               />
             </div>
             <div className="space-y-2">
