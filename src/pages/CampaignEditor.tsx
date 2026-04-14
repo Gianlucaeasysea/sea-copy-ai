@@ -67,7 +67,9 @@ export default function CampaignEditor() {
       language: campaign.language,
       framework: campaign.framework,
       model_used: modelUsed,
-    });
+      products_data: campaign.products_data ?? null,
+      hero_image_url: campaign.hero_image_url ?? null,
+    } as any);
   };
 
   const generate = async () => {
