@@ -14,7 +14,131 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      brand_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          value?: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      campaigns: {
+        Row: {
+          body_markdown: string | null
+          context_notes: string | null
+          created_at: string
+          framework: string
+          id: string
+          klaviyo_campaign_id: string | null
+          language: string
+          name: string
+          notion_url: string | null
+          preview_text: string | null
+          shopify_product_ids: string[] | null
+          status: string
+          subject_line: string | null
+          subject_tone: string | null
+          type: string
+          updated_at: string
+          whatsapp_copy: string | null
+        }
+        Insert: {
+          body_markdown?: string | null
+          context_notes?: string | null
+          created_at?: string
+          framework?: string
+          id?: string
+          klaviyo_campaign_id?: string | null
+          language?: string
+          name: string
+          notion_url?: string | null
+          preview_text?: string | null
+          shopify_product_ids?: string[] | null
+          status?: string
+          subject_line?: string | null
+          subject_tone?: string | null
+          type: string
+          updated_at?: string
+          whatsapp_copy?: string | null
+        }
+        Update: {
+          body_markdown?: string | null
+          context_notes?: string | null
+          created_at?: string
+          framework?: string
+          id?: string
+          klaviyo_campaign_id?: string | null
+          language?: string
+          name?: string
+          notion_url?: string | null
+          preview_text?: string | null
+          shopify_product_ids?: string[] | null
+          status?: string
+          subject_line?: string | null
+          subject_tone?: string | null
+          type?: string
+          updated_at?: string
+          whatsapp_copy?: string | null
+        }
+        Relationships: []
+      }
+      corrections: {
+        Row: {
+          campaign_id: string | null
+          category: string
+          corrected_text: string
+          created_at: string
+          id: string
+          is_active: boolean
+          language: string
+          note: string | null
+          original_text: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          category?: string
+          corrected_text: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          language?: string
+          note?: string | null
+          original_text: string
+        }
+        Update: {
+          campaign_id?: string | null
+          category?: string
+          corrected_text?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          language?: string
+          note?: string | null
+          original_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corrections_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
