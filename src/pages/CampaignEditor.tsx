@@ -740,6 +740,16 @@ export default function CampaignEditor() {
           onConfirm={handleProductElementsConfirm}
         />
       )}
+
+      {/* Hero Image Creator */}
+      <HeroImageCreator
+        open={heroCreatorOpen}
+        onClose={() => setHeroCreatorOpen(false)}
+        onImageReady={async (url) => {
+          await supabase.from("campaigns").update({ hero_image_url: url } as any).eq("id", id);
+          setCampaign((c: any) => ({ ...c, hero_image_url: url }));
+        }}
+      />
     </div>
   );
 }
