@@ -23,19 +23,103 @@ function renderMarkdown(md: string): string {
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
     .replace(/~~(.*?)~~/g, '<s style="color:#999">$1</s>')
-    .replace(/^#{1,2} (.+)$/gm, '<h2 style="font-size:22px;font-weight:700;margin:20px 0 8px;color:#0A1628">$1</h2>')
-    .replace(/^#{3,6} (.+)$/gm, '<h3 style="font-size:16px;font-weight:600;margin:16px 0 6px;color:#0A1628">$1</h3>')
-    .replace(/^[-*] (.+)$/gm, '<li style="margin:4px 0">$1</li>')
+    .replace(/^#{1,2} (.+)$/gm, '<h2 style="font-family:Inter,Arial,sans-serif;font-size:22px;font-weight:700;margin:20px 0 8px;color:#0A1628;line-height:1.3">$1</h2>')
+    .replace(/^#{3,6} (.+)$/gm, '<h3 style="font-family:Inter,Arial,sans-serif;font-size:16px;font-weight:600;margin:16px 0 6px;color:#0A1628;line-height:1.3">$1</h3>')
+    .replace(/^[-*] (.+)$/gm, '<li style="margin:4px 0;font-family:Inter,Arial,sans-serif;font-size:15px;color:#333;line-height:1.6">$1</li>')
     .replace(/(<li[^>]*>.*<\/li>)/gs, '<ul style="padding-left:20px;margin:12px 0">$1</ul>')
-    .replace(/→ (.+)/g, '<a href="#" style="display:inline-block;background:#0A1628;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;margin:8px 0">→ $1</a>')
+    .replace(/→ (.+)/g, '<a href="#" style="display:inline-block;background:#0A1628;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin:8px 0">→ $1</a>')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" style="color:#00C9B1;text-decoration:underline">$1</a>')
-    .replace(/\n\n/g, '</p><p style="margin:12px 0;line-height:1.6;color:#333">')
-    .replace(/^(?!<[h|u|a|p])/, '<p style="margin:12px 0;line-height:1.6;color:#333">')
+    .replace(/\n\n/g, '</p><p style="margin:12px 0;line-height:1.6;color:#333;font-family:Inter,Arial,sans-serif;font-size:15px">')
+    .replace(/^(?!<[huap])/, '<p style="margin:12px 0;line-height:1.6;color:#333;font-family:Inter,Arial,sans-serif;font-size:15px">')
     .replace(/(?<![>])$/, "</p>");
 }
 
 function formatPrice(price: string) {
   return `€${parseFloat(price).toLocaleString("it-IT", { minimumFractionDigits: 2 })}`;
+}
+
+function buildProductCardsHtml(products: Product[]): string {
+  if (!products || products.length === 0) return "";
+
+  const cards = products.map((p) => {
+    const imgHtml = p.image_url
+      ? `<img src="${p.image_url}" alt="${p.title}" style="display:block;width:100%;border-radius:10px 10px 0 0" />`
+      : "";
+    const compareHtml = p.compare_at_price
+      ? `<span style="font-size:12px;color:#999;text-decoration:line-through;margin-right:6px">${formatPrice(p.compare_at_price)}</span>`
+      : "";
+    const priceColor = p.compare_at_price ? "#dc2626" : "#0A1628";
+    const ctaLabel = p.in_stock ? "Ordina ora →" : "Scopri →";
+
+    return `<td style="width:50%;vertical-align:top;padding:8px">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff">
+        <tr><td>${imgHtml}</td></tr>
+        <tr><td style="padding:12px">
+          <p style="font-family:Inter,Arial,sans-serif;font-size:13px;font-weight:600;margin:0 0 4px;color:#0A1628;line-height:1.3">${p.title}</p>
+          <p style="margin:0 0 10px">
+            ${compareHtml}<span style="font-family:Inter,Arial,sans-serif;font-size:13px;font-weight:700;color:${priceColor}">${formatPrice(p.price)}</span>
+          </p>
+          <a href="${p.url}" target="_blank" rel="noopener noreferrer" style="display:block;background:#0A1628;color:#ffffff;text-align:center;padding:8px 0;border-radius:6px;font-family:Inter,Arial,sans-serif;font-size:12px;font-weight:600;text-decoration:none">${ctaLabel}</a>
+        </td></tr>
+      </table>
+    </td>`;
+  });
+
+  let rows = "";
+  for (let i = 0; i < cards.length; i += 2) {
+    const second = cards[i + 1] || "<td></td>";
+    rows += `<tr>${cards[i]}${second}</tr>`;
+  }
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px">${rows}</table>`;
+}
+
+function buildEmailHtml(
+  bodyMarkdown: string,
+  heroImageUrl?: string | null,
+  products: Product[] = []
+): string {
+  const bodyHtml = renderMarkdown(bodyMarkdown);
+  const productCardsHtml = buildProductCardsHtml(products);
+
+  const heroHtml = heroImageUrl
+    ? `<tr><td><img src="${heroImageUrl}" alt="Hero" style="display:block;width:100%;max-height:320px;object-fit:cover" /></td></tr>`
+    : "";
+
+  return `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f4f6">
+<tr><td align="center" style="padding:0">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;overflow:hidden">
+
+<!-- Header -->
+<tr><td style="background:#0A1628;padding:16px 24px">
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td style="color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.5px">easysea®</td>
+<td align="right" style="font-family:Inter,Arial,sans-serif;font-size:11px;font-weight:500"><a href="https://www.easysea.org" style="color:#00C9B1;text-decoration:none">easysea.org</a></td>
+</tr>
+</table>
+</td></tr>
+
+${heroHtml}
+
+<!-- Body -->
+<tr><td style="padding:24px 32px;font-family:Inter,Arial,sans-serif">
+${bodyHtml}
+${productCardsHtml}
+</td></tr>
+
+<!-- Footer -->
+<tr><td style="background:#f3f4f6;padding:16px 32px;border-top:1px solid #e5e7eb;text-align:center">
+<p style="font-family:Inter,Arial,sans-serif;font-size:11px;color:#9ca3af;margin:0">easysea® · Via dell'innovazione · Italia</p>
+<p style="font-family:Inter,Arial,sans-serif;font-size:11px;color:#9ca3af;margin:4px 0 0">
+<a href="#" style="color:#9ca3af;text-decoration:underline">Disiscriviti</a> · <a href="https://www.easysea.org" style="color:#00C9B1;text-decoration:none">easysea.org</a>
+</p>
+</td></tr>
+
+</table>
+</td></tr>
+</table>`;
 }
 
 export default function EmailPreview({
@@ -47,6 +131,10 @@ export default function EmailPreview({
   products = [],
   language,
 }: EmailPreviewProps) {
+  const emailHtml = bodyMarkdown
+    ? buildEmailHtml(bodyMarkdown, heroImageUrl, products)
+    : "";
+
   return (
     <div className="space-y-6">
       {/* Email Preview */}
@@ -75,133 +163,16 @@ export default function EmailPreview({
             )}
           </div>
 
-          {/* Email body */}
-          <div className="mx-auto" style={{ maxWidth: 600, fontFamily: "'Inter', sans-serif" }}>
-            {/* Header bar */}
-            <div
-              style={{
-                background: "#0A1628",
-                padding: "16px 24px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <span style={{ color: "#fff", fontWeight: 700, fontSize: 18, letterSpacing: "-0.5px" }}>
-                easysea®
-              </span>
-              <span style={{ color: "#00C9B1", fontSize: 11, fontWeight: 500 }}>
-                easysea.org
-              </span>
-            </div>
-
-            {/* Hero image */}
-            {heroImageUrl && (
-              <img
-                src={heroImageUrl}
-                alt="Hero"
-                style={{ width: "100%", maxHeight: 320, objectFit: "cover", display: "block" }}
-              />
-            )}
-
-            {/* Body */}
+          {/* Rendered branded email HTML */}
+          {emailHtml ? (
+            <div dangerouslySetInnerHTML={{ __html: emailHtml }} />
+          ) : (
             <div style={{ padding: "24px 32px" }}>
-              {bodyMarkdown ? (
-                <div dangerouslySetInnerHTML={{ __html: renderMarkdown(bodyMarkdown) }} />
-              ) : (
-                <p style={{ color: "#999", fontStyle: "italic" }}>Il copy apparirà qui dopo la generazione…</p>
-              )}
-
-              {/* Product cards */}
-              {products.length > 0 && (
-                <div style={{ marginTop: 24 }}>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: products.length === 1 ? "1fr" : "repeat(auto-fill, minmax(160px, 1fr))",
-                      gap: 16,
-                    }}
-                  >
-                    {products.map((product) => (
-                      <div
-                        key={product.id}
-                        style={{
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 10,
-                          overflow: "hidden",
-                          background: "#fff",
-                        }}
-                      >
-                        {product.image_url && (
-                          <img
-                            src={product.image_url}
-                            alt={product.title}
-                            style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }}
-                          />
-                        )}
-                        <div style={{ padding: "12px" }}>
-                          <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 4px", color: "#0A1628", lineHeight: 1.3 }}>
-                            {product.title}
-                          </p>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                            {product.compare_at_price && (
-                              <span style={{ fontSize: 12, color: "#999", textDecoration: "line-through" }}>
-                                {formatPrice(product.compare_at_price)}
-                              </span>
-                            )}
-                            <span style={{
-                              fontSize: 13,
-                              fontWeight: 700,
-                              color: product.compare_at_price ? "#dc2626" : "#0A1628",
-                            }}>
-                              {formatPrice(product.price)}
-                            </span>
-                          </div>
-                          <a
-                            href={product.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              display: "block",
-                              background: "#0A1628",
-                              color: "#fff",
-                              textAlign: "center",
-                              padding: "8px 0",
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 600,
-                              textDecoration: "none",
-                            }}
-                          >
-                            {product.in_stock ? "Ordina ora →" : "Scopri →"}
-                          </a>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div
-              style={{
-                background: "#f3f4f6",
-                padding: "16px 32px",
-                borderTop: "1px solid #e5e7eb",
-                textAlign: "center",
-              }}
-            >
-              <p style={{ fontSize: 11, color: "#9ca3af", margin: 0 }}>
-                easysea® · Via dell'innovazione · Italia
-              </p>
-              <p style={{ fontSize: 11, color: "#9ca3af", margin: "4px 0 0" }}>
-                <a href="#" style={{ color: "#9ca3af" }}>Disiscriviti</a>
-                {" · "}
-                <a href="https://www.easysea.org" style={{ color: "#00C9B1" }}>easysea.org</a>
+              <p style={{ color: "#999", fontStyle: "italic", fontFamily: "Inter, Arial, sans-serif" }}>
+                Il copy apparirà qui dopo la generazione…
               </p>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
