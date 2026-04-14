@@ -43,8 +43,13 @@ async function getFlowKPIs(
   timeframeKey: TimeframeKey = "last_30_days"
 ): Promise<Record<string, FlowKPI>> {
   try {
-    const statistics = ["opens", "open_rate", "clicks", "click_rate"];
-    if (conversionMetricId) statistics.push("attributed_revenue");
+    // conversion_metric_id is required by Klaviyo API
+    if (!conversionMetricId) {
+      console.warn("No conversion metric found — skipping KPI fetch");
+      return {};
+    }
+
+    const statistics = ["opens", "open_rate", "clicks", "click_rate", "attributed_revenue"];
 
     const payload: any = {
       data: {
@@ -52,12 +57,10 @@ async function getFlowKPIs(
         attributes: {
           timeframe: { key: timeframeKey },
           statistics,
+          conversion_metric_id: conversionMetricId,
         },
       },
     };
-    if (conversionMetricId) {
-      payload.data.attributes.conversion_metric_id = conversionMetricId;
-    }
 
     const res = await fetch("https://a.klaviyo.com/api/flow-values-reports/", {
       method: "POST",
@@ -210,13 +213,16 @@ serve(async (req) => {
     const enrichedFlows = await Promise.all(
       flows.map(async (flow: any) => {
         try {
-          const actionsRes = await fetch(
-            `https://a.klaviyo.com/api/flows/${flow.id}/flow-actions/` +
-              "?fields[flow-action]=action_type,status&page[size]=25",
-            { headers: kHeaders }
-          );
+          const actionsUrl = `https://a.klaviyo.com/api/flows/${flow.id}/flow-actions/?page[size]=50`;
+          const actionsRes = await fetch(actionsUrl, { headers: kHeaders });
+          if (!actionsRes.ok) {
+            console.warn(`flow-actions for ${flow.id} failed:`, actionsRes.status);
+          }
           const actionsJson = actionsRes.ok ? await actionsRes.json() : { data: [] };
           const actions: any[] = actionsJson.data || [];
+          if (actions.length > 0) {
+            console.log(`Flow ${flow.id} (${flow.attributes?.name}): ${actions.length} actions, types: ${actions.map((a: any) => a.attributes?.action_type).join(", ")}`);
+          }
           return {
             id:            flow.id,
             name:          flow.attributes?.name || "Untitled",
