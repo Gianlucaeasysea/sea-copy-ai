@@ -13,11 +13,12 @@ type TimeframeKey = "last_7_days" | "last_30_days" | "last_90_days" | "last_365_
 async function findConversionMetricId(kHeaders: Record<string, string>): Promise<string | null> {
   try {
     const res = await fetch(
-      "https://a.klaviyo.com/api/metrics?fields[metric]=name&page[size]=100",
+      "https://a.klaviyo.com/api/metrics?page[size]=50",
       { headers: kHeaders }
     );
     if (!res.ok) {
-      console.warn("metrics fetch failed:", res.status);
+      const errText = await res.text();
+      console.warn("metrics fetch failed:", res.status, errText.slice(0, 300));
       return null;
     }
     const json = await res.json();
