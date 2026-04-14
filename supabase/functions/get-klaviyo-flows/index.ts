@@ -71,7 +71,7 @@ async function getFlowKPIs(
     return {};
   }
 
-  const statistics = ["opens", "open_rate", "clicks", "click_rate", "attributed_revenue"];
+  const statistics = ["opens", "open_rate", "clicks", "click_rate", "revenue"];
 
   const payload: any = {
     data: {
