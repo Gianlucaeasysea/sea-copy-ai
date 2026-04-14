@@ -526,22 +526,27 @@ export default function MarketingCalendar() {
                           {dayEvents.map((ev) => {
                             const camp = ev.campaign_id ? campaignMap[ev.campaign_id] : null;
                             const hasEmail = camp && (camp.status === "approved" || camp.subject_line);
+                            const needsEmail = ev.requires_email;
+                            // Determine background highlight for events needing email
+                            const emailBg = needsEmail
+                              ? hasEmail
+                                ? "bg-emerald-100 dark:bg-emerald-900/30 ring-1 ring-emerald-400/50"
+                                : "bg-amber-100 dark:bg-amber-900/30 ring-1 ring-amber-400/50"
+                              : "";
                             return (
                               <div
                                 key={ev.id}
-                                className="group flex items-center gap-1 px-1 py-0.5 rounded text-[11px] leading-tight hover:bg-background/80 transition-colors"
+                                className={`group flex items-center gap-1 px-1 py-0.5 rounded text-[11px] leading-tight hover:bg-background/80 transition-colors ${emailBg}`}
                                 onClick={(e) => { e.stopPropagation(); openEdit(ev); }}
                               >
                                 <span className={`h-2 w-2 rounded-full shrink-0 ${TYPE_COLORS[ev.event_type] || TYPE_COLORS.other}`} />
                                 <span className="truncate flex-1 font-medium">{ev.name}</span>
-                                {ev.campaign_id ? (
+                                {needsEmail && (
                                   hasEmail ? (
-                                    <Check className="h-3 w-3 text-primary shrink-0" />
+                                    <Check className="h-3 w-3 text-emerald-600 shrink-0" />
                                   ) : (
-                                    <span className="text-amber-500 text-[10px] shrink-0">draft</span>
+                                    <span className="text-amber-600 text-[10px] font-semibold shrink-0">✉</span>
                                   )
-                                ) : (
-                                  <X className="h-3 w-3 text-destructive/50 shrink-0" />
                                 )}
                               </div>
                             );
