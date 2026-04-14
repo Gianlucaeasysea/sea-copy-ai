@@ -92,6 +92,7 @@ export default function CampaignEditor() {
   const [editorCollection, setEditorCollection] = useState<ShopifyCollection | null>(null);
   const [productElements, setProductElements] = useState<Record<string, ProductElements>>({});
   const [elementPickerProduct, setElementPickerProduct] = useState<ShopifyProduct | null>(null);
+  const [heroCreatorOpen, setHeroCreatorOpen] = useState(false);
 
   // Sequence state
   const [parsedEmails, setParsedEmails] = useState<ParsedEmail[]>([]);
