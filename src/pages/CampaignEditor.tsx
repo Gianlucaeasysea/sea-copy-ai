@@ -531,6 +531,40 @@ export default function CampaignEditor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Refine & Regenerate modal */}
+      <Dialog open={showRefine} onOpenChange={setShowRefine}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scarta e Rigenera</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              La mail attuale verrà scartata. Aggiungi dettagli per guidare la prossima generazione:
+            </p>
+            <Textarea
+              value={refineNotes}
+              onChange={(e) => setRefineNotes(e.target.value)}
+              placeholder="Es. Più focus sul prodotto X, tono più urgente, aggiungi scarcity, menziona la spedizione gratuita..."
+              className="min-h-[120px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRefine(false)}>Annulla</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setShowRefine(false);
+                generate(refineNotes || undefined);
+                setRefineNotes("");
+              }}
+            >
+              <Trash2 className="mr-1 h-3 w-3" />
+              Scarta & Rigenera
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
