@@ -63,7 +63,10 @@ serve(async (req) => {
       fetch(`${base}/products/${product_id}/metafields.json?limit=250`, { headers }),
     ]);
 
-    if (!productRes.ok) throw new Error(`Shopify product fetch failed: ${productRes.status}`);
+    if (!productRes.ok) {
+      const errorBody = await productRes.text();
+      throw new Error(`Shopify product fetch failed: ${productRes.status} - ${errorBody.slice(0, 200)}`);
+    }
 
     const productJson = await productRes.json();
     const p = productJson.product;
