@@ -257,15 +257,17 @@ export default function KlaviyoFlows() {
             </div>
           </div>
 
-          {flow.total_actions > 0 && (
-            <button
-              onClick={() => toggleExpand(flow.id)}
-              className="shrink-0 mt-1 p-1.5 rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title={isOpen ? "Chiudi email" : "Mostra email del flow"}
-            >
-              {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => toggleExpand(flow.id)}
+            className="shrink-0 mt-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+            title={isOpen ? "Chiudi email" : "Mostra email del flow"}
+            aria-label={isOpen ? `Chiudi email del flow ${flow.name}` : `Mostra email del flow ${flow.name}`}
+          >
+            <Mail className="h-3.5 w-3.5" />
+            <span>Email</span>
+            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
         </div>
 
         {isOpen && (

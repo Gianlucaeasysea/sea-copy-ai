@@ -134,9 +134,10 @@ async function getFlowEmails(
   if (!actionsRes.ok) return [];
 
   const actionsJson = await actionsRes.json();
-  const emailActions = (actionsJson.data || []).filter(
-    (a: any) => a.attributes?.action_type === "send_email"
-  );
+  const emailActions = (actionsJson.data || []).filter((a: any) => {
+    const actionType = String(a.attributes?.action_type || "").toLowerCase();
+    return actionType.includes("email");
+  });
 
   const emails: FlowEmail[] = [];
   for (let i = 0; i < Math.min(emailActions.length, 12); i++) {
@@ -244,8 +245,8 @@ serve(async (req) => {
             archived:      flow.attributes?.archived       || false,
             created:       flow.attributes?.created,
             updated:       flow.attributes?.updated,
-            email_count:   actions.filter((a: any) => a.attributes?.action_type === "send_email").length,
-            sms_count:     actions.filter((a: any) => a.attributes?.action_type === "send_sms").length,
+            email_count:   actions.filter((a: any) => String(a.attributes?.action_type || "").toLowerCase().includes("email")).length,
+            sms_count:     actions.filter((a: any) => String(a.attributes?.action_type || "").toLowerCase().includes("sms")).length,
             total_actions: actions.length,
             kpi:           kpiMap[flow.id] ?? null,
             kpi_available: Object.keys(kpiMap).length > 0,
