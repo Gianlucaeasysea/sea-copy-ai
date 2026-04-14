@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RefreshCw, Check, Save, Send, Pencil } from "lucide-react";
+import { RefreshCw, Check, Save, Send, Pencil, Trash2 } from "lucide-react";
 import EmailPreview from "@/components/EmailPreview";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
