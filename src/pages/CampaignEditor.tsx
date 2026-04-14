@@ -376,6 +376,35 @@ export default function CampaignEditor() {
     setCorrectionNote("");
   };
 
+  const handleDuplicate = async () => {
+    if (!campaign) return;
+    setDuplicating(true);
+    try {
+      const { data, error } = await supabase.from("campaigns").insert({
+        name: `${campaign.name} (${duplicateLanguage.toUpperCase()})`,
+        type: campaign.type,
+        language: duplicateLanguage,
+        framework: campaign.framework,
+        subject_tone: campaign.subject_tone,
+        context_notes: campaign.context_notes,
+        shopify_product_ids: campaign.shopify_product_ids,
+        products_data: campaign.products_data,
+        hero_image_url: campaign.hero_image_url,
+        collection_name: campaign.collection_name,
+        notion_url: campaign.notion_url,
+        status: "draft",
+      }).select().single();
+      if (error) throw error;
+      toast.success(`Campagna duplicata in ${duplicateLanguage.toUpperCase()}!`);
+      setShowDuplicate(false);
+      navigate(`/campaign/${data.id}`);
+    } catch (e: any) {
+      toast.error("Errore nella duplicazione: " + (e?.message || "unknown"));
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   if (!campaign) return <div className="p-6 text-muted-foreground">Loading...</div>;
 
   return (
