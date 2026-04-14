@@ -79,6 +79,35 @@ function buildProductCardsHtml(products: Product[]): string {
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px">${rows}</table>`;
 }
 
+function buildDarkProductCardsHtml(products: Product[]): string {
+  if (!products || products.length === 0) return "";
+  const cards = products.map((p) => {
+    const imgHtml = p.image_url
+      ? `<img src="${p.image_url}" alt="${p.title}" style="display:block;width:100%;border-radius:12px 12px 0 0" />`
+      : "";
+    const compareHtml = p.compare_at_price
+      ? `<span style="font-size:12px;color:#666;text-decoration:line-through;margin-right:6px">${formatPrice(p.compare_at_price)}</span>`
+      : "";
+    const priceColor = p.compare_at_price ? "#ef4444" : "#ffffff";
+    const ctaLabel = p.in_stock ? "Shop now →" : "Discover →";
+    return `<td style="width:50%;vertical-align:top;padding:8px">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:12px;overflow:hidden;background:#111111">
+        <tr><td>${imgHtml}</td></tr>
+        <tr><td style="padding:14px 16px">
+          <p style="font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin:0 0 6px;color:#ffffff;line-height:1.3">${p.title}</p>
+          <p style="margin:0 0 12px">${compareHtml}<span style="font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:700;color:${priceColor}">${formatPrice(p.price)}</span></p>
+          <a href="${p.url}" target="_blank" style="display:block;background:#4355DB;color:#fff;text-align:center;padding:10px 0;border-radius:8px;font-family:Inter,Arial,sans-serif;font-size:13px;font-weight:600;text-decoration:none">${ctaLabel}</a>
+        </td></tr>
+      </table>
+    </td>`;
+  });
+  let rows = "";
+  for (let i = 0; i < cards.length; i += 2) {
+    rows += `<tr>${cards[i]}${cards[i + 1] || "<td></td>"}</tr>`;
+  }
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px">${rows}</table>`;
+}
+
 function buildBrandedHtml(campaign: any, fromName: string): string {
   const bodyHtml = renderMarkdownToHtml(campaign.body_markdown || "");
   const products: Product[] = Array.isArray(campaign.products_data) ? campaign.products_data : [];
