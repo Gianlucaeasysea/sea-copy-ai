@@ -16,6 +16,50 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const categories = ["Terminology", "Tone", "CTA", "Product Naming", "Structure", "Other"];
 
+interface ParsedEmail {
+  index: number;
+  label: string;
+  subject_line: string;
+  preview_text: string;
+  body_markdown: string;
+  whatsapp_copy: string;
+}
+
+function parseSequenceText(fullText: string): ParsedEmail[] {
+  // Try to split on === EMAIL N: Label === delimiter
+  const parts = fullText.split(/===\s*EMAIL\s+(\d+)[:\s—–\-]+([^=\n]+?)\s*===/i);
+
+  if (parts.length < 4) {
+    // Single email — parse normally
+    return [{
+      index: 1,
+      label: "Email",
+      subject_line: (fullText.match(/##\s*Subject Line\s*\n([^\n]+)/i)?.[1] || "").trim(),
+      preview_text:  (fullText.match(/##\s*Preview Text\s*\n([^\n]+)/i)?.[1] || "").trim(),
+      body_markdown: (fullText.match(/##\s*Email Body\s*\n([\s\S]+?)(?=##\s*WhatsApp|$)/i)?.[1] || "").trim(),
+      whatsapp_copy: (fullText.match(/##\s*WhatsApp Version\s*\n([\s\S]+?)(?===\s*EMAIL|\s*$)/i)?.[1] || "").trim(),
+    }];
+  }
+
+  // Multi-email: parts = [before, index1, label1, content1, index2, label2, content2, ...]
+  const results: ParsedEmail[] = [];
+  for (let i = 1; i < parts.length; i += 3) {
+    const content = parts[i + 2] || "";
+    results.push({
+      index:        parseInt(parts[i]) || results.length + 1,
+      label:        (parts[i + 1] || `Email ${i}`).trim(),
+      subject_line: (content.match(/##\s*Subject Line\s*\n([^\n]+)/i)?.[1] || "").trim(),
+      preview_text: (content.match(/##\s*Preview Text\s*\n([^\n]+)/i)?.[1] || "").trim(),
+      body_markdown:(content.match(/##\s*Email Body\s*\n([\s\S]+?)(?=##\s*WhatsApp|$)/i)?.[1] || "").trim(),
+      whatsapp_copy:(content.match(/##\s*WhatsApp Version\s*\n([\s\S]+?)$/i)?.[1] || "").trim(),
+    });
+  }
+  return results.length > 0 ? results : [{
+    index: 1, label: "Email",
+    subject_line: "", preview_text: "", body_markdown: fullText, whatsapp_copy: "",
+  }];
+}
+
 export default function CampaignEditor() {
   const { id } = useParams<{ id: string }>();
   const [campaign, setCampaign] = useState<any>(null);
@@ -33,6 +77,11 @@ export default function CampaignEditor() {
   const [selectedNew, setSelectedNew] = useState("");
   const abortRef = useRef<AbortController | null>(null);
 
+  // Sequence state
+  const [parsedEmails, setParsedEmails] = useState<ParsedEmail[]>([]);
+  const [activeEmailIndex, setActiveEmailIndex] = useState(0);
+  const [isSequence, setIsSequence] = useState(false);
+
   useEffect(() => {
     if (!id) return;
     const load = async () => {
@@ -44,22 +93,42 @@ export default function CampaignEditor() {
         setAiBody(data.body_markdown || "");
         setEditBody(data.body_markdown || "");
         setWhatsapp(data.whatsapp_copy || "");
+
+        // Restore sequence state if available
+        if ((data as any).is_sequence && (data as any).sequence_emails) {
+          const emails = (data as any).sequence_emails as ParsedEmail[];
+          setParsedEmails(emails);
+          setIsSequence(true);
+          setActiveEmailIndex(0);
+        }
       }
     };
     load();
   }, [id]);
+
+  const handleEmailTabChange = (index: number) => {
+    setActiveEmailIndex(index);
+    const email = parsedEmails[index];
+    if (!email) return;
+    setSubjectLine(email.subject_line);
+    setPreviewText(email.preview_text);
+    setAiBody(email.body_markdown);
+    setEditBody(email.body_markdown);
+    setWhatsapp(email.whatsapp_copy);
+  };
 
   const saveToLibrary = async (
     subj: string,
     preview: string,
     body: string,
     wa: string,
-    modelUsed: string
+    modelUsed: string,
+    emailLabel?: string
   ) => {
     if (!campaign) return;
     await supabase.from("generated_emails").insert({
       campaign_id: campaign.id,
-      campaign_name: campaign.name,
+      campaign_name: emailLabel ? `${campaign.name} — ${emailLabel}` : campaign.name,
       subject_line: subj,
       preview_text: preview,
       body_markdown: body,
@@ -78,6 +147,9 @@ export default function CampaignEditor() {
     setEditBody("");
     setWhatsapp("");
     setSubjectLine("");
+    setParsedEmails([]);
+    setIsSequence(false);
+    setActiveEmailIndex(0);
 
     try {
       const controller = new AbortController();
@@ -132,21 +204,42 @@ export default function CampaignEditor() {
         }
       }
 
-      const subjectMatch = fullText.match(/## Subject Line\n(.+)/);
-      const previewMatch = fullText.match(/## Preview Text\n(.+)/);
-      const whatsappMatch = fullText.match(/## WhatsApp Version\n([\s\S]+?)(?=\n## |$)/);
-      const bodyMatch = fullText.match(/## Email Body\n([\s\S]+?)(?=\n## WhatsApp|$)/);
+      // Parse sequence or single email
+      const emails = parseSequenceText(fullText);
+      const isSeq = emails.length > 1;
 
-      const parsedSubject = subjectMatch ? subjectMatch[1].trim() : "";
-      const parsedPreview = previewMatch ? previewMatch[1].trim() : "";
-      const parsedBody = bodyMatch ? bodyMatch[1].trim() : fullText;
-      const parsedWhatsapp = whatsappMatch ? whatsappMatch[1].trim() : "";
+      setParsedEmails(emails);
+      setIsSequence(isSeq);
+      setActiveEmailIndex(0);
 
-      if (parsedSubject) setSubjectLine(parsedSubject);
-      if (parsedPreview) setPreviewText(parsedPreview);
-      if (parsedWhatsapp) setWhatsapp(parsedWhatsapp);
+      // Set fields with first email
+      setSubjectLine(emails[0].subject_line);
+      setPreviewText(emails[0].preview_text);
+      setAiBody(emails[0].body_markdown);
+      setEditBody(emails[0].body_markdown);
+      setWhatsapp(emails[0].whatsapp_copy);
 
-      await saveToLibrary(parsedSubject, parsedPreview, parsedBody, parsedWhatsapp, modelUsed);
+      // Save each email to Library
+      for (const email of emails) {
+        await saveToLibrary(
+          email.subject_line,
+          email.preview_text,
+          email.body_markdown,
+          email.whatsapp_copy,
+          modelUsed,
+          isSeq ? email.label : undefined
+        );
+      }
+
+      // Update campaign
+      await supabase.from("campaigns").update({
+        subject_line: emails[0].subject_line,
+        preview_text: emails[0].preview_text,
+        body_markdown: emails[0].body_markdown,
+        whatsapp_copy: emails[0].whatsapp_copy,
+        is_sequence: isSeq,
+        sequence_emails: isSeq ? emails : null,
+      } as any).eq("id", campaign.id);
 
     } catch (e: any) {
       if (e.name !== "AbortError") toast.error("Generation error");
@@ -156,12 +249,34 @@ export default function CampaignEditor() {
 
   const save = async () => {
     if (!id) return;
-    await supabase.from("campaigns").update({
-      subject_line: subjectLine,
-      preview_text: previewText,
-      body_markdown: editBody,
-      whatsapp_copy: whatsapp,
-    }).eq("id", id);
+
+    // If sequence, update the active email in parsedEmails too
+    if (isSequence && parsedEmails.length > 0) {
+      const updated = [...parsedEmails];
+      updated[activeEmailIndex] = {
+        ...updated[activeEmailIndex],
+        subject_line: subjectLine,
+        preview_text: previewText,
+        body_markdown: editBody,
+        whatsapp_copy: whatsapp,
+      };
+      setParsedEmails(updated);
+
+      await supabase.from("campaigns").update({
+        subject_line: subjectLine,
+        preview_text: previewText,
+        body_markdown: editBody,
+        whatsapp_copy: whatsapp,
+        sequence_emails: updated,
+      } as any).eq("id", id);
+    } else {
+      await supabase.from("campaigns").update({
+        subject_line: subjectLine,
+        preview_text: previewText,
+        body_markdown: editBody,
+        whatsapp_copy: whatsapp,
+      }).eq("id", id);
+    }
     toast.success("Saved!");
   };
 
@@ -275,6 +390,30 @@ export default function CampaignEditor() {
         </div>
       </div>
 
+      {/* Sequence tab navigation — visible only for multi-email frameworks */}
+      {isSequence && parsedEmails.length > 1 && (
+        <div className="border-b bg-muted/30 px-4 py-2 flex items-center gap-2 overflow-x-auto shrink-0">
+          <span className="text-xs font-semibold text-muted-foreground shrink-0 mr-1">
+            Sequenza:
+          </span>
+          {parsedEmails.map((email, i) => (
+            <button
+              key={i}
+              onClick={() => handleEmailTabChange(i)}
+              className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap border
+                ${activeEmailIndex === i
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background hover:bg-accent border-border"}`}
+            >
+              {email.label || `Email ${email.index}`}
+            </button>
+          ))}
+          <span className="text-xs text-muted-foreground ml-2 shrink-0">
+            {activeEmailIndex + 1} / {parsedEmails.length}
+          </span>
+        </div>
+      )}
+
       {/* Split view */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Editable */}
@@ -282,6 +421,11 @@ export default function CampaignEditor() {
           <div className="flex items-center gap-2 mb-3">
             <Badge variant="secondary" className="text-xs">Editable</Badge>
             <Badge variant="outline" className="text-xs">{campaign.framework}</Badge>
+            {isSequence && (
+              <Badge variant="outline" className="text-xs bg-teal-50 text-teal-700 border-teal-200">
+                {parsedEmails.length} email
+              </Badge>
+            )}
           </div>
           <Textarea
             value={editBody}

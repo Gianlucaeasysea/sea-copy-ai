@@ -12,6 +12,7 @@ import BrandSettings from "./pages/BrandSettings";
 import Library from "./pages/Library";
 import Guide from "./pages/Guide";
 import MarketingCalendar from "./pages/MarketingCalendar";
+import KlaviyoFlows from "./pages/KlaviyoFlows";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/corrections" element={<Corrections />} />
             <Route path="/guide" element={<Guide />} />
             <Route path="/settings" element={<BrandSettings />} />
+            <Route path="/flows" element={<KlaviyoFlows />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppLayout>

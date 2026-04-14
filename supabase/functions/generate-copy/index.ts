@@ -17,6 +17,40 @@ const FRAMEWORK_TEMPLATES: Record<string, string> = {
   "Plain Broadcast": "Structure: Direct, conversational announcement. No heavy framework. Just inform clearly and link.",
 };
 
+// Frameworks that produce multiple emails — each entry is the role/instruction for that email
+const MULTI_EMAIL_FRAMEWORKS: Record<string, string[]> = {
+  "SOAP Opera Sequence": [
+    "Email 1 — Setting: introduce il contesto, crea curiosità per la prossima email. NON vendere ancora. Finisci con un hook che fa venire voglia di aprire la prossima.",
+    "Email 2 — Drama & Backstory: svela il conflitto e il retroscena che ha portato alla creazione del prodotto. Coinvolgi emotivamente.",
+    "Email 3 — Wall: il momento più buio. Il problema sembra insormontabile. Finisce con un cliffhanger forte.",
+    "Email 4 — Epiphany: la svolta. L'insight che cambia tutto. Introduce il prodotto come soluzione naturale della storia.",
+    "Email 5 — Solution & Offer: presenta il prodotto con piena chiarezza. CTA diretta. Urgenza reale se disponibile.",
+  ],
+  "Welcome Series": [
+    "Email 1 — Benvenuto: presentazione del brand con una storia vera. Nessuna vendita. Crea attesa per la prossima.",
+    "Email 2 — Il problema: il problema che ha dato origine al brand. Backstory autentico.",
+    "Email 3 — La soluzione: presenta il prodotto come risultato naturale del viaggio descritto.",
+    "Email 4 — Social proof: recensioni reali, casi d'uso concreti, numeri. Prima CTA diretta.",
+    "Email 5 — Offerta di benvenuto: offerta di conversione con scadenza (es. 10% sul primo ordine).",
+  ],
+  "Launch Sequence": [
+    "Email 1 — Teaser (7 giorni prima): crea curiosità senza rivelare nulla. Zero dettagli tecnici. Cliffhanger.",
+    "Email 2 — Reveal (3 giorni prima): presenta il prodotto in dettaglio. Features, story, benefici. CTA pre-notifica.",
+    "Email 3 — Launch Day: lancio ufficiale. CTA principale. Urgenza reale se c'è (stock limitato, prezzo lancio).",
+    "Email 4 — Last Call (3 giorni dopo): chiusura. Urgenza finale o approfondimento per chi non ha ancora deciso.",
+  ],
+  "Re-engagement": [
+    "Email 1 — Ricontatto: breve, diretta. Riconosce il silenzio senza drammatizzarlo. Offre valore.",
+    "Email 2 — Ultima chance: offerta concreta di riattivazione con scadenza chiara.",
+    "Email 3 — Breakup: 'Ti rimuoviamo dalla lista — a meno che...' Onesta e funziona.",
+  ],
+  "Post-Purchase": [
+    "Email 1 — Conferma & benvenuto nel brand: conferma ordine + messaggio caldo. Nessun upsell aggressivo.",
+    "Email 2 — Come usarlo al meglio: tutorial breve o tip d'uso. Costruisce competenza, riduce resi.",
+    "Email 3 — Come sta andando?: richiesta recensione con tono personale. 14 giorni dopo la consegna.",
+  ],
+};
+
 function claudeStreamToOpenAI(claudeStream: ReadableStream): ReadableStream {
   const reader = claudeStream.getReader();
   const decoder = new TextDecoder();
@@ -82,6 +116,14 @@ serve(async (req) => {
       .single();
     if (!campaign) throw new Error("Campaign not found");
 
+    // Mark campaign as sequence if applicable (for frontend tab rendering)
+    if (campaign.framework in MULTI_EMAIL_FRAMEWORKS && !campaign.is_sequence) {
+      await supabase
+        .from("campaigns")
+        .update({ is_sequence: true })
+        .eq("id", campaign_id);
+    }
+
     const { data: settingsRows } = await supabase.from("brand_settings").select("*");
     const settings: Record<string, string> = {};
     settingsRows?.forEach((r: any) => { settings[r.key] = r.value; });
@@ -128,8 +170,46 @@ REAL CTA EXAMPLES:
 ${(voiceAnalysis.cta_examples as string[] || []).slice(0, 10).map((s: string, i: number) => `${i + 1}. ${s}`).join("\n")}`
       : `BRAND VOICE: ${settings.brand_voice || "Energetic, direct, technical but accessible. No fluff. Sailors talk to sailors. Short sentences."}`;
 
+    const isSequence = campaign.framework in MULTI_EMAIL_FRAMEWORKS;
+    const sequenceEmails = MULTI_EMAIL_FRAMEWORKS[campaign.framework];
     const frameworkGuide =
       FRAMEWORK_TEMPLATES[campaign.framework] || FRAMEWORK_TEMPLATES["Plain Broadcast"];
+
+    const outputFormat = isSequence
+      ? `This is a MULTI-EMAIL SEQUENCE. Generate ALL ${sequenceEmails.length} emails.
+
+Use this EXACT delimiter between emails (do not change the format):
+=== EMAIL [N]: [Label] ===
+
+For EACH email output these sections:
+
+## Subject Line
+[subject]
+
+## Preview Text
+[preview, max 90 chars]
+
+## Email Body
+[full body for this email's role in the sequence]
+
+## WhatsApp Version
+[short version, max 5 lines + link]
+
+Each email must be self-contained but reference the narrative thread.
+Each email except the last must end creating desire to open the next.`
+      : `Generate the following sections in this exact format:
+
+## Subject Line
+[One compelling subject line]
+
+## Preview Text
+[Short preview text, max 90 chars]
+
+## Email Body
+[Full email body using the ${campaign.framework} framework. Use markdown for formatting.]
+
+## WhatsApp Version
+[Short version, max 5 lines + link placeholder. Casual, direct tone.]`;
 
     const systemPrompt = `You are an expert email marketing copywriter for easysea®, an Italian sailing gear brand.
 
@@ -149,30 +229,48 @@ LANGUAGE: Write in ${
         : "both Italian and English (clearly separated with headings)"
     }
 
-Generate the following sections in this exact format:
+${outputFormat}`;
 
-## Subject Line
-[One compelling subject line]
-
-## Preview Text
-[Short preview text, max 90 chars]
-
-## Email Body
-[Full email body using the ${campaign.framework} framework. Use markdown for formatting.]
-
-## WhatsApp Version
-[Short version, max 5 lines + link placeholder. Casual, direct tone.]`;
-
-    // Build product context for the prompt
+    // Build product context for the prompt — includes deep elements if user selected them
     let productContext = "";
     if (campaign.products_data && Array.isArray(campaign.products_data) && campaign.products_data.length > 0) {
-      productContext = "\n\nFEATURED PRODUCTS (include these in the copy with their exact details):\n" +
-        (campaign.products_data as any[]).map((p: any, i: number) => {
-          const price = p.compare_at_price
-            ? `~~€${parseFloat(p.compare_at_price).toFixed(2)}~~ €${parseFloat(p.price).toFixed(2)}`
-            : `€${parseFloat(p.price).toFixed(2)}`;
-          return `${i + 1}. ${p.title}\n   Price: ${price}\n   URL: ${p.url}\n   In stock: ${p.in_stock ? "yes" : "no (still feature it)"}`;
-        }).join("\n\n");
+      productContext = "\n\nFEATURED PRODUCTS — use the selected elements below to write about each product:\n";
+
+      for (const [i, p] of (campaign.products_data as any[]).entries()) {
+        const el = p.elements;
+        const showCompare = el?.include_compare_price !== false;
+        const price = p.compare_at_price && showCompare
+          ? `~~€${parseFloat(p.compare_at_price).toFixed(2)}~~ €${parseFloat(p.price).toFixed(2)}`
+          : `€${parseFloat(p.price).toFixed(2)}`;
+
+        productContext += `\n--- PRODUCT ${i + 1}: ${p.title} ---\n`;
+        if (!el || el.include_price !== false) productContext += `Price: ${price}\n`;
+        productContext += `URL: ${p.url}\n`;
+        productContext += `In stock: ${p.in_stock ? "yes" : "no (still feature it)"}\n`;
+
+        if (el?.include_description && el.description_text) {
+          productContext += `\nDescription:\n${el.description_text.slice(0, 600)}\n`;
+        }
+
+        if (el?.include_features?.length > 0) {
+          productContext += `\nKey features (use these in the copy):\n`;
+          productContext += el.include_features.map((f: string) => `• ${f}`).join("\n") + "\n";
+        }
+
+        if (el?.include_specs?.length > 0) {
+          productContext += `\nTechnical specs:\n`;
+          productContext += el.include_specs.map((s: string) => `• ${s}`).join("\n") + "\n";
+        }
+
+        if (el?.include_images?.length > 0) {
+          productContext += `\nProduct images:\n`;
+          productContext += el.include_images.slice(0, 3).map((url: string) => `• ${url}`).join("\n") + "\n";
+        }
+
+        if (el?.include_variants_info && p.variants?.length > 1) {
+          productContext += `\nVariants: ${p.variants.map((v: any) => v.title).join(", ")}\n`;
+        }
+      }
     }
 
     if (campaign.collection_name) {
@@ -184,7 +282,11 @@ Type: ${campaign.type}
 ${campaign.context_notes ? `Context: ${campaign.context_notes}` : ""}
 ${productContext}
 
-Generate the email and WhatsApp copy now.`;
+${isSequence
+  ? `Generate the complete ${sequenceEmails.length}-email sequence. Follow these exact roles:\n` +
+    sequenceEmails.map((role, i) => `${i + 1}. ${role}`).join("\n")
+  : "Generate the email and WhatsApp copy now."
+}`;
 
     const claudeApiKey = settings.claude_api_key;
 
@@ -199,7 +301,7 @@ Generate the email and WhatsApp copy now.`;
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 2048,
+          max_tokens: isSequence ? 6000 : 2048,
           stream: true,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
@@ -238,6 +340,7 @@ Generate the email and WhatsApp copy now.`;
           { role: "user", content: userPrompt },
         ],
         stream: true,
+        max_tokens: isSequence ? 6000 : 2048,
       }),
     });
 

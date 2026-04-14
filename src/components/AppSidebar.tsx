@@ -1,4 +1,4 @@
-import { LayoutDashboard, PlusCircle, BookOpen, Library, HelpCircle, Settings, Sparkles, CalendarDays } from "lucide-react";
+import { LayoutDashboard, PlusCircle, BookOpen, Library, HelpCircle, Settings, Sparkles, CalendarDays, Workflow } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
