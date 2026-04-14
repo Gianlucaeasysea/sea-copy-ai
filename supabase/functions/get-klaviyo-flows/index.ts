@@ -13,7 +13,7 @@ type TimeframeKey = "last_7_days" | "last_30_days" | "last_90_days" | "last_365_
 async function findConversionMetricId(kHeaders: Record<string, string>): Promise<string | null> {
   try {
     const res = await fetch(
-      "https://a.klaviyo.com/api/metrics?page[size]=50",
+      "https://a.klaviyo.com/api/metrics",
       { headers: kHeaders }
     );
     if (!res.ok) {
