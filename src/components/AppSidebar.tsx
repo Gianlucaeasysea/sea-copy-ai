@@ -17,6 +17,7 @@ const items = [
   { title: "New Campaign", url: "/new-campaign", icon: PlusCircle },
   { title: "Calendario", url: "/calendar", icon: CalendarDays },
   { title: "Library", url: "/library", icon: Library },
+  { title: "Klaviyo Flows", url: "/flows", icon: Workflow },
   { title: "Corrections", url: "/corrections", icon: BookOpen },
   { title: "Guide", url: "/guide", icon: HelpCircle },
   { title: "Brand Settings", url: "/settings", icon: Settings },
