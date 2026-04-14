@@ -11,6 +11,7 @@ import Corrections from "./pages/Corrections";
 import BrandSettings from "./pages/BrandSettings";
 import Library from "./pages/Library";
 import Guide from "./pages/Guide";
+import MarketingCalendar from "./pages/MarketingCalendar";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/new-campaign" element={<NewCampaign />} />
             <Route path="/campaign/:id" element={<CampaignEditor />} />
             <Route path="/library" element={<Library />} />
+            <Route path="/calendar" element={<MarketingCalendar />} />
             <Route path="/corrections" element={<Corrections />} />
             <Route path="/guide" element={<Guide />} />
             <Route path="/settings" element={<BrandSettings />} />
