@@ -20,19 +20,25 @@ function formatPrice(price: string): string {
   return `€${parseFloat(price).toLocaleString("it-IT", { minimumFractionDigits: 2 })}`;
 }
 
-function renderMarkdownToHtml(md: string): string {
+function renderMarkdownToHtml(md: string, dark = false): string {
+  const fg = dark ? "#ffffff" : "#0A1628";
+  const bodyColor = dark ? "#cccccc" : "#333";
+  const linkColor = dark ? "#4355DB" : "#00C9B1";
+  const ctaBg = dark ? "#4355DB" : "#0A1628";
+  const strikeFg = dark ? "#666" : "#999";
+
   return md
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/~~(.*?)~~/g, '<s style="color:#999">$1</s>')
-    .replace(/^#{1,2} (.+)$/gm, '<h2 style="font-family:Inter,Arial,sans-serif;font-size:22px;font-weight:700;margin:20px 0 8px;color:#0A1628;line-height:1.3">$1</h2>')
-    .replace(/^#{3,6} (.+)$/gm, '<h3 style="font-family:Inter,Arial,sans-serif;font-size:16px;font-weight:600;margin:16px 0 6px;color:#0A1628;line-height:1.3">$1</h3>')
-    .replace(/^[-*] (.+)$/gm, '<li style="margin:4px 0;font-family:Inter,Arial,sans-serif;font-size:15px;color:#333;line-height:1.6">$1</li>')
-    .replace(/(<li[^>]*>.*<\/li>)/gs, '<ul style="padding-left:20px;margin:12px 0">$1</ul>')
-    .replace(/→ (.+)/g, `<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" style="height:40px;v-text-anchor:middle;width:200px" arcsize="15%" strokecolor="#0A1628" fillcolor="#0A1628"><center style="color:#fff;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600">→ $1</center></v:roundrect><![endif]--><a href="#" style="display:inline-block;background:#0A1628;color:#ffffff;padding:10px 24px;border-radius:6px;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin:8px 0;mso-hide:all">→ $1</a>`)
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" style="color:#00C9B1;text-decoration:underline">$1</a>')
-    .replace(/\n\n/g, '</p><p style="margin:12px 0;line-height:1.6;color:#333;font-family:Inter,Arial,sans-serif;font-size:15px">')
-    .replace(/^(?!<[huap])/, '<p style="margin:12px 0;line-height:1.6;color:#333;font-family:Inter,Arial,sans-serif;font-size:15px">')
+    .replace(/~~(.*?)~~/g, `<s style="color:${strikeFg}">$1</s>`)
+    .replace(/^#{1,2} (.+)$/gm, `<h2 style="font-family:Inter,Arial,sans-serif;font-size:24px;font-weight:700;margin:24px 0 10px;color:${fg};line-height:1.25;letter-spacing:-0.3px">$1</h2>`)
+    .replace(/^#{3,6} (.+)$/gm, `<h3 style="font-family:Inter,Arial,sans-serif;font-size:17px;font-weight:600;margin:18px 0 6px;color:${fg};line-height:1.3">$1</h3>`)
+    .replace(/^[-*] (.+)$/gm, `<li style="margin:6px 0;font-family:Inter,Arial,sans-serif;font-size:15px;color:${bodyColor};line-height:1.7">$1</li>`)
+    .replace(/(<li[^>]*>.*<\/li>)/gs, '<ul style="padding-left:20px;margin:14px 0">$1</ul>')
+    .replace(/→ (.+)/g, `<a href="#" style="display:inline-block;background:${ctaBg};color:#ffffff;padding:12px 28px;border-radius:8px;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin:12px 0;letter-spacing:0.3px">→ $1</a>`)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, `<a href="$2" style="color:${linkColor};text-decoration:underline">$1</a>`)
+    .replace(/\n\n/g, `</p><p style="margin:14px 0;line-height:1.7;color:${bodyColor};font-family:Inter,Arial,sans-serif;font-size:15px">`)
+    .replace(/^(?!<[huap])/, `<p style="margin:14px 0;line-height:1.7;color:${bodyColor};font-family:Inter,Arial,sans-serif;font-size:15px">`)
     .replace(/(?<![>])$/, "</p>");
 }
 
