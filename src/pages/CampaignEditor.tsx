@@ -158,7 +158,7 @@ export default function CampaignEditor() {
     } as any);
   };
 
-  const generate = async () => {
+  const generate = async (extraNotes?: string) => {
     setGenerating(true);
     setAiBody("");
     setEditBody("");
@@ -167,6 +167,14 @@ export default function CampaignEditor() {
     setParsedEmails([]);
     setIsSequence(false);
     setActiveEmailIndex(0);
+
+    // If extra notes provided, append to campaign context_notes before generating
+    if (extraNotes && campaign) {
+      const existing = campaign.context_notes || "";
+      const merged = existing ? `${existing}\n\nNote aggiuntive: ${extraNotes}` : extraNotes;
+      await supabase.from("campaigns").update({ context_notes: merged }).eq("id", campaign.id);
+      setCampaign((c: any) => ({ ...c, context_notes: merged }));
+    }
 
     try {
       const controller = new AbortController();
