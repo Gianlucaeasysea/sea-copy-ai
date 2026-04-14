@@ -43,8 +43,13 @@ async function getFlowKPIs(
   timeframeKey: TimeframeKey = "last_30_days"
 ): Promise<Record<string, FlowKPI>> {
   try {
-    const statistics = ["opens", "open_rate", "clicks", "click_rate"];
-    if (conversionMetricId) statistics.push("attributed_revenue");
+    // conversion_metric_id is required by Klaviyo API
+    if (!conversionMetricId) {
+      console.warn("No conversion metric found — skipping KPI fetch");
+      return {};
+    }
+
+    const statistics = ["opens", "open_rate", "clicks", "click_rate", "attributed_revenue"];
 
     const payload: any = {
       data: {
@@ -52,12 +57,10 @@ async function getFlowKPIs(
         attributes: {
           timeframe: { key: timeframeKey },
           statistics,
+          conversion_metric_id: conversionMetricId,
         },
       },
     };
-    if (conversionMetricId) {
-      payload.data.attributes.conversion_metric_id = conversionMetricId;
-    }
 
     const res = await fetch("https://a.klaviyo.com/api/flow-values-reports/", {
       method: "POST",
@@ -206,47 +209,58 @@ serve(async (req) => {
     const conversionMetricId = await findPlacedOrderMetricId(kHeaders);
     const kpiMap = await getFlowKPIs(kHeaders, conversionMetricId, activeTimeframe);
 
-    // 3. Enrich with action counts
-    const enrichedFlows = await Promise.all(
-      flows.map(async (flow: any) => {
-        try {
-          const actionsRes = await fetch(
-            `https://a.klaviyo.com/api/flows/${flow.id}/flow-actions/` +
-              "?fields[flow-action]=action_type,status&page[size]=25",
-            { headers: kHeaders }
-          );
-          const actionsJson = actionsRes.ok ? await actionsRes.json() : { data: [] };
-          const actions: any[] = actionsJson.data || [];
-          return {
-            id:            flow.id,
-            name:          flow.attributes?.name || "Untitled",
-            status:        flow.attributes?.status || "unknown",
-            trigger_type:  flow.attributes?.trigger_type || "unknown",
-            archived:      flow.attributes?.archived || false,
-            created:       flow.attributes?.created,
-            updated:       flow.attributes?.updated,
-            email_count:   actions.filter((a: any) => a.attributes?.action_type === "send_email").length,
-            sms_count:     actions.filter((a: any) => a.attributes?.action_type === "send_sms").length,
-            total_actions: actions.length,
-            kpi:           kpiMap[flow.id] || null,
-          };
-        } catch {
-          return {
-            id:            flow.id,
-            name:          flow.attributes?.name || "Untitled",
-            status:        flow.attributes?.status || "unknown",
-            trigger_type:  flow.attributes?.trigger_type || "unknown",
-            archived:      flow.attributes?.archived || false,
-            created:       flow.attributes?.created,
-            updated:       flow.attributes?.updated,
-            email_count:   0,
-            sms_count:     0,
-            total_actions: 0,
-            kpi:           kpiMap[flow.id] || null,
-          };
-        }
-      })
-    );
+    // 3. Enrich with action counts (batches of 3 to avoid 429 rate limits)
+    async function fetchActions(flow: any) {
+      const isActive = !flow.attributes?.archived &&
+        (flow.attributes?.status === "live" || flow.attributes?.status === "draft" || flow.attributes?.status === "manual");
+      if (!isActive) {
+        return {
+          id: flow.id, name: flow.attributes?.name || "Untitled",
+          status: flow.attributes?.status || "unknown",
+          trigger_type: flow.attributes?.trigger_type || "unknown",
+          archived: flow.attributes?.archived || false,
+          created: flow.attributes?.created, updated: flow.attributes?.updated,
+          email_count: 0, sms_count: 0, total_actions: 0,
+          kpi: kpiMap[flow.id] || null,
+        };
+      }
+      try {
+        const res = await fetch(
+          `https://a.klaviyo.com/api/flows/${flow.id}/flow-actions/?page[size]=50`,
+          { headers: kHeaders }
+        );
+        const json = res.ok ? await res.json() : { data: [] };
+        const actions: any[] = json.data || [];
+        return {
+          id: flow.id, name: flow.attributes?.name || "Untitled",
+          status: flow.attributes?.status || "unknown",
+          trigger_type: flow.attributes?.trigger_type || "unknown",
+          archived: false, created: flow.attributes?.created, updated: flow.attributes?.updated,
+          email_count: actions.filter((a: any) => a.attributes?.action_type?.toLowerCase() === "send_email").length,
+          sms_count: actions.filter((a: any) => a.attributes?.action_type?.toLowerCase() === "send_sms").length,
+          total_actions: actions.length,
+          kpi: kpiMap[flow.id] || null,
+        };
+      } catch {
+        return {
+          id: flow.id, name: flow.attributes?.name || "Untitled",
+          status: flow.attributes?.status || "unknown",
+          trigger_type: flow.attributes?.trigger_type || "unknown",
+          archived: false, created: flow.attributes?.created, updated: flow.attributes?.updated,
+          email_count: 0, sms_count: 0, total_actions: 0,
+          kpi: kpiMap[flow.id] || null,
+        };
+      }
+    }
+
+    const enrichedFlows: any[] = [];
+    const BATCH = 3;
+    for (let i = 0; i < flows.length; i += BATCH) {
+      const batch = flows.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(fetchActions));
+      enrichedFlows.push(...results);
+      if (i + BATCH < flows.length) await new Promise((r) => setTimeout(r, 400));
+    }
 
     enrichedFlows.sort((a, b) => {
       if (a.status === "live" && b.status !== "live") return -1;
