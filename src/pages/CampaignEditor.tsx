@@ -75,6 +75,8 @@ export default function CampaignEditor() {
   const [correctionNote, setCorrectionNote] = useState("");
   const [selectedOld, setSelectedOld] = useState("");
   const [selectedNew, setSelectedNew] = useState("");
+  const [showRefine, setShowRefine] = useState(false);
+  const [refineNotes, setRefineNotes] = useState("");
   const abortRef = useRef<AbortController | null>(null);
 
   // Sequence state
