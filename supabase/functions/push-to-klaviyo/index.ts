@@ -205,13 +205,35 @@ serve(async (req) => {
     const templateId = templateData?.data?.id;
     console.log("Created Klaviyo template:", templateId);
 
-    // 3. Create campaign
+    // 3. Get Klaviyo list for audiences
+    const listId = settings.klaviyo_list_id;
+    let audienceListId = listId;
+    if (!audienceListId) {
+      // Fetch first available list from Klaviyo
+      const listsRes = await fetch("https://a.klaviyo.com/api/lists/?page[size]=1", { headers });
+      if (listsRes.ok) {
+        const listsData = await listsRes.json();
+        audienceListId = listsData?.data?.[0]?.id;
+      }
+    }
+    if (!audienceListId) {
+      throw new Error("No Klaviyo list found. Configure 'klaviyo_list_id' in Brand Settings or create a list in Klaviyo.");
+    }
+    console.log("Using Klaviyo list:", audienceListId);
+
+    // 4. Create campaign
     const campaignPayload = {
       data: {
         type: "campaign",
         attributes: {
           name: `[EasyCopy] ${campaign.name} — ${new Date().toLocaleDateString("it-IT")}`,
-          channel: "email",
+          audiences: {
+            included: [audienceListId],
+          },
+          send_strategy: {
+            method: "static",
+            options_static: null,
+          },
           "campaign-messages": {
             data: [
               {
