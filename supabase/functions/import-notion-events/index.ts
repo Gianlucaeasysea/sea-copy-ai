@@ -5,40 +5,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Extract Notion page ID from various URL formats
 function extractPageId(url: string): string | null {
-  // Remove query params
   const clean = url.split("?")[0].split("#")[0];
-  // Match the last 32-hex-char segment (with or without dashes)
-  const match = clean.match(/([a-f0-9]{32})$/i) || clean.match(/([a-f0-9-]{36})$/i);
+  const match = clean.match(/([a-f0-9]{32})$/i);
   if (!match) return null;
-  const raw = match[1].replace(/-/g, "");
-  if (raw.length !== 32) return null;
-  // Format as UUID
+  const raw = match[1];
   return `${raw.slice(0,8)}-${raw.slice(8,12)}-${raw.slice(12,16)}-${raw.slice(16,20)}-${raw.slice(20)}`;
-}
-
-// Recursively extract text from Notion block results
-function extractTextFromBlocks(blocks: any[]): string {
-  const lines: string[] = [];
-  for (const block of blocks) {
-    const richTexts = block[block.type]?.rich_text || block[block.type]?.text || [];
-    if (Array.isArray(richTexts)) {
-      const line = richTexts.map((rt: any) => rt.plain_text || "").join("");
-      if (line.trim()) lines.push(line.trim());
-    }
-    // Table rows
-    if (block.type === "table_row" && block.table_row?.cells) {
-      const row = block.table_row.cells.map((cell: any[]) =>
-        cell.map((rt: any) => rt.plain_text || "").join("")
-      ).join(" | ");
-      if (row.trim()) lines.push(row.trim());
-    }
-    if (block.children) {
-      lines.push(extractTextFromBlocks(block.children));
-    }
-  }
-  return lines.join("\n");
 }
 
 serve(async (req) => {
@@ -51,10 +23,10 @@ serve(async (req) => {
     const pageId = extractPageId(notion_url);
     if (!pageId) throw new Error("Could not extract Notion page ID from URL");
 
-    console.log("Fetching Notion page:", pageId);
+    console.log("Page ID:", pageId);
 
-    // Use Notion's unofficial API to load page content (works for public pages)
-    const loadRes = await fetch(`https://notion.so/api/v3/loadPageChunk`, {
+    // 1. Load the page to find collection info
+    const loadRes = await fetch("https://www.notion.so/api/v3/loadPageChunk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -65,77 +37,126 @@ serve(async (req) => {
         verticalColumns: false,
       }),
     });
+    if (!loadRes.ok) throw new Error(`Notion loadPageChunk failed: ${loadRes.status}`);
+    const loadData = await loadRes.json();
+    const recordMap = loadData?.recordMap || {};
 
-    if (!loadRes.ok) {
-      throw new Error(`Notion API returned ${loadRes.status}`);
+    // Find collection and view IDs
+    const collectionIds = Object.keys(recordMap.collection || {});
+    const viewIds = Object.keys(recordMap.collection_view || {});
+
+    if (collectionIds.length > 0 && viewIds.length > 0) {
+      // It's a database page — query rows
+      const collectionId = collectionIds[0];
+      const viewId = viewIds[0];
+      const schema = recordMap.collection?.[collectionId]?.value?.value?.schema || {};
+
+      console.log("Database found. Collection:", collectionId, "Schema keys:", Object.keys(schema).length);
+
+      const queryRes = await fetch("https://www.notion.so/api/v3/queryCollection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          collection: { id: collectionId },
+          collectionView: { id: viewId },
+          loader: {
+            type: "reducer",
+            reducers: {
+              collection_group_results: { type: "results", limit: 200 },
+            },
+            searchQuery: "",
+            userTimeZone: "Europe/Rome",
+          },
+        }),
+      });
+      if (!queryRes.ok) throw new Error(`Notion queryCollection failed: ${queryRes.status}`);
+      const queryData = await queryRes.json();
+      const blocks = queryData?.recordMap?.block || {};
+
+      // Parse rows into events
+      const events: any[] = [];
+      for (const [, bdata] of Object.entries(blocks) as any) {
+        const value = bdata?.value?.value;
+        if (!value || value.type !== "page") continue;
+        const props = value.properties || {};
+
+        let name = "";
+        let startDate = "";
+        let endDate = "";
+        let tags: string[] = [];
+        let notes = "";
+
+        for (const [pid, pval] of Object.entries(props) as any) {
+          const col = schema[pid];
+          if (!col) continue;
+          const colType = col.type;
+          const colName = (col.name || "").toLowerCase();
+
+          if (colType === "title") {
+            name = Array.isArray(pval) ? pval.map((s: any) => s[0]).join("") : "";
+          } else if (colType === "date" && Array.isArray(pval)) {
+            // Extract date from Notion's format: [["‣", [["d", {...}]]]]
+            try {
+              const dateInfo = pval[0]?.[1]?.[0]?.[1];
+              if (dateInfo?.start_date) startDate = dateInfo.start_date;
+              if (dateInfo?.end_date) endDate = dateInfo.end_date;
+            } catch { /* skip */ }
+          } else if (colType === "multi_select" || colType === "select") {
+            const tagStr = Array.isArray(pval) ? pval.map((s: any) => s[0]).join("") : "";
+            tags = tagStr.split(",").map((t: string) => t.trim()).filter(Boolean);
+          } else if (colType === "text" || colName.includes("note") || colName.includes("desc")) {
+            notes = Array.isArray(pval) ? pval.map((s: any) => s[0]).join("") : "";
+          }
+        }
+
+        if (!name || !startDate) continue;
+
+        // Determine event type from tags
+        let eventType = "other";
+        const tagLower = tags.join(" ").toLowerCase();
+        if (tagLower.includes("promo") || tagLower.includes("sconto") || tagLower.includes("free")) eventType = "promo";
+        else if (tagLower.includes("lancio") || tagLower.includes("launch")) eventType = "launch";
+        else if (tagLower.includes("seasonal") || tagLower.includes("stagion")) eventType = "seasonal";
+        else if (tagLower.includes("holiday") || tagLower.includes("festiv")) eventType = "holiday";
+        else if (tagLower.includes("content") || tagLower.includes("mail") || tagLower.includes("whatsapp")) eventType = "content";
+
+        events.push({
+          name,
+          event_date: startDate,
+          event_type: eventType,
+          notes: [tags.join(", "), notes, endDate ? `Fine: ${endDate}` : ""].filter(Boolean).join(" — ") || null,
+        });
+
+        // If it's a date range, also note end date is in the event
+      }
+
+      console.log("Events parsed:", events.length);
+
+      return new Response(JSON.stringify({ events }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const pageData = await loadRes.json();
-    const recordMap = pageData?.recordMap || {};
-    const blocks = recordMap?.block || {};
-
-    // Extract all text content from blocks
+    // Fallback: plain text page — use AI extraction
+    const blocks = recordMap.block || {};
     const textParts: string[] = [];
-    for (const [, blockData] of Object.entries(blocks) as any) {
-      const value = blockData?.value;
-      if (!value) continue;
-      
-      // Get title/text from properties
-      const props = value.properties;
-      if (props) {
-        for (const [, propVal] of Object.entries(props) as any) {
-          if (Array.isArray(propVal)) {
-            const text = propVal.map((segment: any) => {
-              if (Array.isArray(segment)) return segment[0] || "";
-              return "";
-            }).join("");
-            if (text.trim()) textParts.push(text.trim());
-          }
-        }
-      }
-
-      // Collection views (databases) - extract from collection data
-      if (value.type === "collection_view" || value.type === "collection_view_page") {
-        const collectionId = value.collection_id;
-        const collection = recordMap?.collection?.[collectionId]?.value;
-        if (collection?.name) {
-          const name = collection.name.map((s: any) => s[0]).join("");
-          textParts.push(`Collection: ${name}`);
+    for (const [, bdata] of Object.entries(blocks) as any) {
+      const value = bdata?.value?.value;
+      if (!value?.properties) continue;
+      for (const [, pval] of Object.entries(value.properties) as any) {
+        if (Array.isArray(pval)) {
+          const text = pval.map((s: any) => (Array.isArray(s) ? s[0] : "")).join("");
+          if (text.trim()) textParts.push(text.trim());
         }
       }
     }
-
-    // Also extract from collection rows if present
-    const collections = recordMap?.collection || {};
-    for (const [, collData] of Object.entries(collections) as any) {
-      const schema = collData?.value?.schema;
-      if (schema) {
-        // We have a database schema, now look for rows in blocks
-        for (const [, blockData] of Object.entries(blocks) as any) {
-          const value = blockData?.value;
-          if (!value?.properties || !value?.parent_id) continue;
-          const row: string[] = [];
-          for (const [propId, propVal] of Object.entries(value.properties) as any) {
-            const colName = schema[propId]?.name || propId;
-            const text = Array.isArray(propVal)
-              ? propVal.map((s: any) => (Array.isArray(s) ? s[0] : "")).join("")
-              : "";
-            if (text.trim()) row.push(`${colName}: ${text.trim()}`);
-          }
-          if (row.length > 0) textParts.push(row.join(" | "));
-        }
-      }
-    }
-
     const fullText = textParts.join("\n").slice(0, 10000);
-    console.log("Extracted text length:", fullText.length);
-    console.log("Text preview:", fullText.slice(0, 500));
+    console.log("Fallback text extraction, length:", fullText.length);
 
     if (fullText.length < 20) {
-      throw new Error("Could not extract text from the Notion page. Make sure it's publicly shared (Share → Publish to web).");
+      throw new Error("Nessun contenuto trovato. Assicurati che la pagina sia pubblica (Share → Publish to web).");
     }
 
-    // Use AI to extract events
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -150,36 +171,19 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You extract marketing events from text. Return ONLY a JSON array of objects with these fields:
-- "name": event name (string)
-- "event_date": date in YYYY-MM-DD format (string)
-- "event_type": one of "promo", "launch", "seasonal", "holiday", "content", "other" (string)
-- "notes": any extra details (string or null)
-
-If you find dates in relative format, use today's date ${new Date().toISOString().split("T")[0]} as reference.
-If a date is ambiguous or missing the year, assume ${new Date().getFullYear()}.
-Return ONLY the JSON array, no markdown, no explanation. If no events found, return [].`,
+            content: `Extract marketing events. Return ONLY a JSON array: [{"name":"...","event_date":"YYYY-MM-DD","event_type":"promo|launch|seasonal|holiday|content|other","notes":"..."}]. No markdown. Today is ${new Date().toISOString().split("T")[0]}.`,
           },
-          {
-            role: "user",
-            content: `Extract all marketing events with dates from this text:\n\n${fullText}`,
-          },
+          { role: "user", content: fullText },
         ],
         temperature: 0.1,
       }),
     });
 
-    if (!aiRes.ok) {
-      const errBody = await aiRes.text();
-      throw new Error(`AI extraction failed (${aiRes.status}): ${errBody}`);
-    }
-
+    if (!aiRes.ok) throw new Error(`AI failed: ${aiRes.status}`);
     const aiData = await aiRes.json();
     let content = aiData.choices?.[0]?.message?.content || "[]";
     content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
     const events = JSON.parse(content);
-
-    console.log("Events found:", events.length);
 
     return new Response(JSON.stringify({ events }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
