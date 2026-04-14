@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RefreshCw, Check, Save, Send, Pencil, Trash2 } from "lucide-react";
+import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy } from "lucide-react";
 import EmailPreview from "@/components/EmailPreview";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -62,6 +62,7 @@ function parseSequenceText(fullText: string): ParsedEmail[] {
 
 export default function CampaignEditor() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [campaign, setCampaign] = useState<any>(null);
   const [subjectLine, setSubjectLine] = useState("");
   const [previewText, setPreviewText] = useState("");
@@ -77,6 +78,9 @@ export default function CampaignEditor() {
   const [selectedNew, setSelectedNew] = useState("");
   const [showRefine, setShowRefine] = useState(false);
   const [refineNotes, setRefineNotes] = useState("");
+  const [showDuplicate, setShowDuplicate] = useState(false);
+  const [duplicateLanguage, setDuplicateLanguage] = useState("it");
+  const [duplicating, setDuplicating] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   // Sequence state
@@ -372,6 +376,35 @@ export default function CampaignEditor() {
     setCorrectionNote("");
   };
 
+  const handleDuplicate = async () => {
+    if (!campaign) return;
+    setDuplicating(true);
+    try {
+      const { data, error } = await supabase.from("campaigns").insert({
+        name: `${campaign.name} (${duplicateLanguage.toUpperCase()})`,
+        type: campaign.type,
+        language: duplicateLanguage,
+        framework: campaign.framework,
+        subject_tone: campaign.subject_tone,
+        context_notes: campaign.context_notes,
+        shopify_product_ids: campaign.shopify_product_ids,
+        products_data: campaign.products_data,
+        hero_image_url: campaign.hero_image_url,
+        collection_name: campaign.collection_name,
+        notion_url: campaign.notion_url,
+        status: "draft",
+      }).select().single();
+      if (error) throw error;
+      toast.success(`Campagna duplicata in ${duplicateLanguage.toUpperCase()}!`);
+      setShowDuplicate(false);
+      navigate(`/campaign/${data.id}`);
+    } catch (e: any) {
+      toast.error("Errore nella duplicazione: " + (e?.message || "unknown"));
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   if (!campaign) return <div className="p-6 text-muted-foreground">Loading...</div>;
 
   return (
@@ -417,6 +450,14 @@ export default function CampaignEditor() {
           >
             <Send className="mr-1 h-3 w-3" />
             {pushingKlaviyo ? "Pushing..." : "→ Klaviyo"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { setDuplicateLanguage(campaign.language === "it" ? "en" : "it"); setShowDuplicate(true); }}
+          >
+            <Copy className="mr-1 h-3 w-3" />
+            Duplica
           </Button>
         </div>
       </div>
@@ -561,6 +602,36 @@ export default function CampaignEditor() {
             >
               <Trash2 className="mr-1 h-3 w-3" />
               Scarta & Rigenera
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Duplicate modal */}
+      <Dialog open={showDuplicate} onOpenChange={setShowDuplicate}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Duplica Campagna</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Duplica questa campagna e genera il copy in un'altra lingua.
+            </p>
+            <div className="space-y-2">
+              <Label>Lingua</Label>
+              <Select value={duplicateLanguage} onValueChange={setDuplicateLanguage}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="it">🇮🇹 Italiano</SelectItem>
+                  <SelectItem value="en">🇬🇧 English</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDuplicate(false)}>Annulla</Button>
+            <Button onClick={handleDuplicate} disabled={duplicating}>
+              <Copy className="mr-1 h-3 w-3" />
+              {duplicating ? "Duplicando..." : "Duplica & Genera"}
             </Button>
           </DialogFooter>
         </DialogContent>
