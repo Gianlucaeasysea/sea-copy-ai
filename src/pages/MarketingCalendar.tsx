@@ -281,7 +281,7 @@ export default function MarketingCalendar() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
-            <Upload className="mr-1 h-3 w-3" /> Importa CSV
+            <Upload className="mr-1 h-3 w-3" /> Importa
           </Button>
           <Button size="sm" onClick={() => openAdd()}>
             <Plus className="mr-1 h-3 w-3" /> Nuovo Evento
