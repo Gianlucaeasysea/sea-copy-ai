@@ -85,6 +85,13 @@ export default function CampaignEditor() {
   const [duplicating, setDuplicating] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Shopify product picker state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [editorProducts, setEditorProducts] = useState<ShopifyProduct[]>([]);
+  const [editorCollection, setEditorCollection] = useState<ShopifyCollection | null>(null);
+  const [productElements, setProductElements] = useState<Record<string, ProductElements>>({});
+  const [elementPickerProduct, setElementPickerProduct] = useState<ShopifyProduct | null>(null);
+
   // Sequence state
   const [parsedEmails, setParsedEmails] = useState<ParsedEmail[]>([]);
   const [activeEmailIndex, setActiveEmailIndex] = useState(0);
