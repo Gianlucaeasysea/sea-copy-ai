@@ -163,9 +163,26 @@ Generate the following sections in this exact format:
 ## WhatsApp Version
 [Short version, max 5 lines + link placeholder. Casual, direct tone.]`;
 
+    // Build product context for the prompt
+    let productContext = "";
+    if (campaign.products_data && Array.isArray(campaign.products_data) && campaign.products_data.length > 0) {
+      productContext = "\n\nFEATURED PRODUCTS (include these in the copy with their exact details):\n" +
+        (campaign.products_data as any[]).map((p: any, i: number) => {
+          const price = p.compare_at_price
+            ? `~~€${parseFloat(p.compare_at_price).toFixed(2)}~~ €${parseFloat(p.price).toFixed(2)}`
+            : `€${parseFloat(p.price).toFixed(2)}`;
+          return `${i + 1}. ${p.title}\n   Price: ${price}\n   URL: ${p.url}\n   In stock: ${p.in_stock ? "yes" : "no (still feature it)"}`;
+        }).join("\n\n");
+    }
+
+    if (campaign.collection_name) {
+      productContext += `\n\nFEATURED COLLECTION: ${campaign.collection_name}`;
+    }
+
     const userPrompt = `Campaign: "${campaign.name}"
 Type: ${campaign.type}
 ${campaign.context_notes ? `Context: ${campaign.context_notes}` : ""}
+${productContext}
 
 Generate the email and WhatsApp copy now.`;
 
