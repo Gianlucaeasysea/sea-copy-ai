@@ -33,6 +33,8 @@ interface GeneratedEmail {
   language: string | null;
   framework: string | null;
   model_used: string | null;
+  products_data: any[] | null;
+  hero_image_url: string | null;
   created_at: string;
 }
 
@@ -173,6 +175,8 @@ export default function Library() {
                     previewText={email.preview_text || ""}
                     bodyMarkdown={email.body_markdown || ""}
                     whatsappCopy={email.whatsapp_copy || ""}
+                    heroImageUrl={email.hero_image_url}
+                    products={email.products_data || []}
                     language={email.language || undefined}
                   />
                 </CardContent>
