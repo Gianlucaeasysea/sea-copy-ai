@@ -249,7 +249,7 @@ serve(async (req) => {
     const flows: any[] = flowsJson.data || [];
 
     // 2. KPIs
-    const conversionMetricId = await findPlacedOrderMetricId(kHeaders);
+    const conversionMetricId = await findConversionMetricId(kHeaders);
     const kpiMap = await getFlowKPIs(kHeaders, conversionMetricId, activeTimeframe);
 
     // 3. Enrich with action counts + KPIs
