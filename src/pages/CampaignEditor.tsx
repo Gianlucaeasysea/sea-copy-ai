@@ -530,6 +530,39 @@ export default function CampaignEditor() {
         </div>
       )}
 
+      {/* Product bar */}
+      <div className="border-b bg-muted/20 px-4 py-2 flex items-center gap-2 flex-wrap shrink-0">
+        <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
+          <ShoppingBag className="mr-1 h-3 w-3" />
+          {editorProducts.length > 0
+            ? `${editorProducts.length} prodotti`
+            : "Aggiungi prodotti da Shopify"}
+        </Button>
+        {editorProducts.map((p) => (
+          <div key={p.id} className="flex items-center gap-1.5 bg-background rounded-md px-2 py-1 border">
+            {p.image_url && (
+              <img src={p.image_url} alt={p.title} className="h-5 w-5 rounded object-cover" />
+            )}
+            <span className="text-xs max-w-[120px] truncate">{p.title}</span>
+            <button
+              onClick={() => setElementPickerProduct(p)}
+              className="text-xs text-primary underline ml-0.5"
+            >
+              {productElements[p.id] ? "✓" : "dettagli"}
+            </button>
+            <button
+              onClick={() => {
+                const updated = editorProducts.filter((x) => x.id !== p.id);
+                handleProductsChange(updated, editorCollection);
+              }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+
       {/* Split view */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Editable */}
