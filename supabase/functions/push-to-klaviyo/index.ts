@@ -210,10 +210,15 @@ serve(async (req) => {
     let audienceListId = listId;
     if (!audienceListId) {
       // Fetch first available list from Klaviyo
-      const listsRes = await fetch("https://a.klaviyo.com/api/lists/?page[size]=1", { headers });
+      const listsRes = await fetch("https://a.klaviyo.com/api/lists/?page[size]=10", { headers });
+      console.log("Klaviyo lists response status:", listsRes.status);
       if (listsRes.ok) {
         const listsData = await listsRes.json();
+        console.log("Klaviyo lists count:", listsData?.data?.length, "first:", listsData?.data?.[0]?.id);
         audienceListId = listsData?.data?.[0]?.id;
+      } else {
+        const listsErr = await listsRes.text();
+        console.error("Klaviyo lists error:", listsRes.status, listsErr);
       }
     }
     if (!audienceListId) {
