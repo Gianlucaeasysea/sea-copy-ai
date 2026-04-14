@@ -25,6 +25,7 @@ interface MarketingEvent {
   event_type: string;
   campaign_id: string | null;
   notes: string | null;
+  requires_email: boolean;
 }
 
 interface Campaign {
