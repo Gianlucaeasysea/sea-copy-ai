@@ -606,6 +606,36 @@ export default function CampaignEditor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Duplicate modal */}
+      <Dialog open={showDuplicate} onOpenChange={setShowDuplicate}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Duplica Campagna</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Duplica questa campagna e genera il copy in un'altra lingua.
+            </p>
+            <div className="space-y-2">
+              <Label>Lingua</Label>
+              <Select value={duplicateLanguage} onValueChange={setDuplicateLanguage}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="it">🇮🇹 Italiano</SelectItem>
+                  <SelectItem value="en">🇬🇧 English</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDuplicate(false)}>Annulla</Button>
+            <Button onClick={handleDuplicate} disabled={duplicating}>
+              <Copy className="mr-1 h-3 w-3" />
+              {duplicating ? "Duplicando..." : "Duplica & Genera"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
