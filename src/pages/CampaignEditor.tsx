@@ -9,8 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy } from "lucide-react";
+import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X } from "lucide-react";
 import EmailPreview from "@/components/EmailPreview";
+import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
+import ProductElementPicker, { ProductElements } from "@/components/ProductElementPicker";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -83,6 +85,13 @@ export default function CampaignEditor() {
   const [duplicating, setDuplicating] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Shopify product picker state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [editorProducts, setEditorProducts] = useState<ShopifyProduct[]>([]);
+  const [editorCollection, setEditorCollection] = useState<ShopifyCollection | null>(null);
+  const [productElements, setProductElements] = useState<Record<string, ProductElements>>({});
+  const [elementPickerProduct, setElementPickerProduct] = useState<ShopifyProduct | null>(null);
+
   // Sequence state
   const [parsedEmails, setParsedEmails] = useState<ParsedEmail[]>([]);
   const [activeEmailIndex, setActiveEmailIndex] = useState(0);
@@ -108,6 +117,11 @@ export default function CampaignEditor() {
           setParsedEmails(emails);
           setIsSequence(true);
           setActiveEmailIndex(0);
+        }
+
+        // Restore products from campaign
+        if (data.products_data && Array.isArray(data.products_data)) {
+          setEditorProducts(data.products_data as any);
         }
 
         // Auto-generate if campaign has no body yet
@@ -405,6 +419,36 @@ export default function CampaignEditor() {
     }
   };
 
+  const handleProductsChange = async (products: ShopifyProduct[], collection: ShopifyCollection | null) => {
+    setEditorProducts(products);
+    setEditorCollection(collection);
+    const productsData = products.length > 0
+      ? products.map((p) => ({ ...p, elements: productElements[p.id] || null }))
+      : null;
+    await supabase.from("campaigns").update({
+      products_data: productsData as any,
+      collection_name: collection?.title || null,
+      hero_image_url: campaign.hero_image_url || products[0]?.image_url || null,
+    } as any).eq("id", id);
+    setCampaign((c: any) => ({
+      ...c,
+      products_data: productsData,
+      collection_name: collection?.title || null,
+      hero_image_url: c.hero_image_url || products[0]?.image_url || null,
+    }));
+    toast.success("Prodotti aggiornati!");
+  };
+
+  const handleProductElementsConfirm = async (elements: ProductElements) => {
+    const newElements = { ...productElements, [elements.product_id]: elements };
+    setProductElements(newElements);
+    // Update products_data with new elements
+    const productsData = editorProducts.map((p) => ({ ...p, elements: newElements[p.id] || null }));
+    await supabase.from("campaigns").update({ products_data: productsData as any } as any).eq("id", id);
+    setCampaign((c: any) => ({ ...c, products_data: productsData }));
+    toast.success("Dettagli prodotto aggiornati!");
+  };
+
   if (!campaign) return <div className="p-6 text-muted-foreground">Loading...</div>;
 
   return (
@@ -486,6 +530,39 @@ export default function CampaignEditor() {
         </div>
       )}
 
+      {/* Product bar */}
+      <div className="border-b bg-muted/20 px-4 py-2 flex items-center gap-2 flex-wrap shrink-0">
+        <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
+          <ShoppingBag className="mr-1 h-3 w-3" />
+          {editorProducts.length > 0
+            ? `${editorProducts.length} prodotti`
+            : "Aggiungi prodotti da Shopify"}
+        </Button>
+        {editorProducts.map((p) => (
+          <div key={p.id} className="flex items-center gap-1.5 bg-background rounded-md px-2 py-1 border">
+            {p.image_url && (
+              <img src={p.image_url} alt={p.title} className="h-5 w-5 rounded object-cover" />
+            )}
+            <span className="text-xs max-w-[120px] truncate">{p.title}</span>
+            <button
+              onClick={() => setElementPickerProduct(p)}
+              className="text-xs text-primary underline ml-0.5"
+            >
+              {productElements[p.id] ? "✓" : "dettagli"}
+            </button>
+            <button
+              onClick={() => {
+                const updated = editorProducts.filter((x) => x.id !== p.id);
+                handleProductsChange(updated, editorCollection);
+              }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+
       {/* Split view */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Editable */}
@@ -525,7 +602,7 @@ export default function CampaignEditor() {
             bodyMarkdown={editBody}
             whatsappCopy={whatsapp}
             heroImageUrl={(campaign as any)?.hero_image_url}
-            products={(campaign as any)?.products_data as any[] || []}
+            products={editorProducts.length > 0 ? editorProducts : ((campaign as any)?.products_data as any[] || [])}
             language={campaign?.language}
           />
         </div>
@@ -636,6 +713,24 @@ export default function CampaignEditor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Product Picker modal */}
+      <ProductPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selectedProducts={editorProducts}
+        onSelect={handleProductsChange}
+      />
+
+      {/* Product Element Picker modal */}
+      {elementPickerProduct && (
+        <ProductElementPicker
+          open={!!elementPickerProduct}
+          onClose={() => setElementPickerProduct(null)}
+          productId={elementPickerProduct.id}
+          productTitle={elementPickerProduct.title}
+          onConfirm={handleProductElementsConfirm}
+        />
+      )}
     </div>
   );
 }
