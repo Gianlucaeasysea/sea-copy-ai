@@ -447,10 +447,12 @@ export default function MarketingCalendar() {
           </span>
         ))}
         <span className="flex items-center gap-1.5 ml-4">
-          <Check className="h-3 w-3 text-primary" /> Email scritta
+          <span className="inline-block h-3 w-5 rounded bg-emerald-100 ring-1 ring-emerald-400/50 dark:bg-emerald-900/30" />
+          <span>Email pronta</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <X className="h-3 w-3 text-destructive" /> Da scrivere
+          <span className="inline-block h-3 w-5 rounded bg-amber-100 ring-1 ring-amber-400/50 dark:bg-amber-900/30" />
+          <span>Email da scrivere</span>
         </span>
       </div>
 
@@ -644,6 +646,19 @@ export default function MarketingCalendar() {
             <div className="space-y-2">
               <Label>Note</Label>
               <Textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Dettagli opzionali…" className="min-h-[60px]" />
+            </div>
+            <div className="flex items-center gap-2 p-3 border rounded-lg">
+              <Checkbox
+                id="requires-email"
+                checked={formRequiresEmail}
+                onCheckedChange={(v) => setFormRequiresEmail(!!v)}
+              />
+              <Label htmlFor="requires-email" className="cursor-pointer">
+                Richiede email
+                <span className="text-xs text-muted-foreground block">
+                  L'evento verrà evidenziato nel calendario (verde = pronta, giallo = da scrivere)
+                </span>
+              </Label>
             </div>
           </div>
           <DialogFooter className="flex justify-between">
