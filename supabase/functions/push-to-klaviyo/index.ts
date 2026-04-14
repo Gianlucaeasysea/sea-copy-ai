@@ -242,6 +242,7 @@ ${productCardsHtml}
 </center>
 </body>
 </html>`;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
