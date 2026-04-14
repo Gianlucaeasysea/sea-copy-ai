@@ -247,7 +247,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { campaign_id } = await req.json();
+    const { campaign_id, branded_style } = await req.json();
     if (!campaign_id) throw new Error("campaign_id required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -277,8 +277,10 @@ serve(async (req) => {
       revision,
     };
 
-    // 1. Build branded HTML
-    const brandedHtml = buildBrandedHtml(campaign, fromName);
+    // 1. Build HTML (branded dark or classic)
+    const brandedHtml = branded_style
+      ? buildDarkBrandedHtml(campaign, fromName)
+      : buildBrandedHtml(campaign, fromName);
 
     // 2. Create Klaviyo template
     const templateRes = await fetch("https://a.klaviyo.com/api/templates/", {
