@@ -256,6 +256,7 @@ export type Database = {
         Row: {
           campaign_id: string | null
           created_at: string
+          end_date: string | null
           event_date: string
           event_type: string
           id: string
@@ -266,6 +267,7 @@ export type Database = {
         Insert: {
           campaign_id?: string | null
           created_at?: string
+          end_date?: string | null
           event_date: string
           event_type?: string
           id?: string
@@ -276,6 +278,7 @@ export type Database = {
         Update: {
           campaign_id?: string | null
           created_at?: string
+          end_date?: string | null
           event_date?: string
           event_type?: string
           id?: string
