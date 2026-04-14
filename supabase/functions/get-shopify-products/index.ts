@@ -18,7 +18,16 @@ serve(async (req) => {
     const settings: Record<string, string> = {};
     settingsRows?.forEach((r: any) => { settings[r.key] = r.value; });
 
-    const storeUrl = settings.shopify_store_url?.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    let storeUrl = settings.shopify_store_url?.replace(/^https?:\/\//, "").replace(/\/$/, "") || "";
+    // Handle admin URL format: admin.shopify.com/store/{store-name} → {store-name}.myshopify.com
+    const adminMatch = storeUrl.match(/admin\.shopify\.com\/store\/([^\/]+)/);
+    if (adminMatch) {
+      storeUrl = `${adminMatch[1]}.myshopify.com`;
+    }
+    // Handle bare store name without .myshopify.com
+    if (storeUrl && !storeUrl.includes(".")) {
+      storeUrl = `${storeUrl}.myshopify.com`;
+    }
     const token = settings.shopify_admin_token;
     if (!storeUrl || !token) throw new Error("Shopify credentials not configured in Brand Settings");
 
