@@ -2,13 +2,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   RefreshCw, Mail, MessageSquare, Zap, ChevronDown, ChevronUp,
-  TrendingUp, MousePointerClick, Euro, CalendarDays, AlertCircle,
+  TrendingUp, MousePointerClick, Euro, AlertCircle,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
