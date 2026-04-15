@@ -14,6 +14,7 @@ import EmailPreview from "@/components/EmailPreview";
 import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
 import ProductElementPicker, { ProductElements } from "@/components/ProductElementPicker";
 import HeroImageCreator from "@/components/HeroImageCreator";
+import ImageInserter from "@/components/ImageInserter";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -94,6 +95,8 @@ export default function CampaignEditor() {
   const [elementPickerProduct, setElementPickerProduct] = useState<ShopifyProduct | null>(null);
   const [heroCreatorOpen, setHeroCreatorOpen] = useState(false);
   const [brandedStyle, setBrandedStyle] = useState(false);
+  const [imageInserterOpen, setImageInserterOpen] = useState(false);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
 
   // Sequence state
   const [parsedEmails, setParsedEmails] = useState<ParsedEmail[]>([]);
@@ -591,8 +594,14 @@ export default function CampaignEditor() {
                 {parsedEmails.length} email
               </Badge>
             )}
+            <div className="ml-auto">
+              <Button size="sm" variant="ghost" onClick={() => setImageInserterOpen(true)}>
+                <ImageIcon className="mr-1 h-3 w-3" /> Inserisci immagine
+              </Button>
+            </div>
           </div>
           <Textarea
+            ref={editorRef}
             value={editBody}
             onChange={(e) => setEditBody(e.target.value)}
             className="min-h-[400px] font-mono text-sm resize-none border-0 focus-visible:ring-0 p-0"
@@ -758,6 +767,25 @@ export default function CampaignEditor() {
           await supabase.from("campaigns").update({ hero_image_url: url } as any).eq("id", id);
           setCampaign((c: any) => ({ ...c, hero_image_url: url }));
         }}
+      />
+
+      {/* Image Inserter */}
+      <ImageInserter
+        open={imageInserterOpen}
+        onClose={() => setImageInserterOpen(false)}
+        onInsert={(md) => {
+          const textarea = editorRef.current;
+          if (textarea) {
+            const pos = textarea.selectionStart || editBody.length;
+            const newBody = editBody.slice(0, pos) + md + editBody.slice(pos);
+            setEditBody(newBody);
+          } else {
+            setEditBody(editBody + md);
+          }
+        }}
+        productImages={editorProducts
+          .filter((p) => p.image_url)
+          .map((p) => ({ url: p.image_url!, title: p.title }))}
       />
     </div>
   );
