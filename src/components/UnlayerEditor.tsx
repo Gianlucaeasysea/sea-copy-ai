@@ -57,12 +57,12 @@ const UnlayerEditor = forwardRef<UnlayerEditorHandle, Props>(
       tools: {
         // Enable all standard tools
       },
-      mergeTags: [
-        { name: "First Name", value: "{{first_name}}" },
-        { name: "Last Name", value: "{{last_name}}" },
-        { name: "Email", value: "{{email}}" },
-        { name: "Unsubscribe", value: "{{unsubscribe_url}}" },
-      ],
+      mergeTags: {
+        first_name: { name: "First Name", value: "{{first_name}}" },
+        last_name: { name: "Last Name", value: "{{last_name}}" },
+        email: { name: "Email", value: "{{email}}" },
+        unsubscribe: { name: "Unsubscribe", value: "{{unsubscribe_url}}" },
+      },
     };
 
     return (
