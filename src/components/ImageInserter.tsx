@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,18 +13,43 @@ interface UnsplashPhoto {
   user: { name: string; username: string };
 }
 
+interface ShopifyImage {
+  url: string;
+  title: string;
+}
+
 interface ImageInserterProps {
   open: boolean;
   onClose: () => void;
   onInsert: (markdownImg: string) => void;
-  productImages: { url: string; title: string }[];
 }
 
-export default function ImageInserter({ open, onClose, onInsert, productImages }: ImageInserterProps) {
+export default function ImageInserter({ open, onClose, onInsert }: ImageInserterProps) {
   const [query, setQuery] = useState("");
   const [photos, setPhotos] = useState<UnsplashPhoto[]>([]);
   const [searching, setSearching] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+  const [shopifyImages, setShopifyImages] = useState<ShopifyImage[]>([]);
+  const [loadingShopify, setLoadingShopify] = useState(false);
+  const [shopifyFilter, setShopifyFilter] = useState("");
+
+  // Fetch all Shopify product images when dialog opens
+  useEffect(() => {
+    if (!open || shopifyImages.length > 0) return;
+    setLoadingShopify(true);
+    supabase.functions.invoke("get-shopify-products")
+      .then(({ data }) => {
+        const images: ShopifyImage[] = [];
+        for (const p of data?.products || []) {
+          for (const imgUrl of p.images || []) {
+            images.push({ url: imgUrl, title: p.title });
+          }
+        }
+        setShopifyImages(images);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingShopify(false));
+  }, [open]);
 
   const searchUnsplash = async () => {
     if (!query.trim()) return;
@@ -56,6 +81,10 @@ export default function ImageInserter({ open, onClose, onInsert, productImages }
     setUrlInput("");
   };
 
+  const filteredShopify = shopifyFilter
+    ? shopifyImages.filter((img) => img.title.toLowerCase().includes(shopifyFilter.toLowerCase()))
+    : shopifyImages;
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
@@ -65,31 +94,48 @@ export default function ImageInserter({ open, onClose, onInsert, productImages }
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue={productImages.length > 0 ? "products" : "unsplash"} className="flex-1 overflow-hidden flex flex-col">
+        <Tabs defaultValue="shopify" className="flex-1 overflow-hidden flex flex-col">
           <TabsList className="shrink-0">
-            {productImages.length > 0 && <TabsTrigger value="products">Prodotti Shopify</TabsTrigger>}
+            <TabsTrigger value="shopify">Shopify</TabsTrigger>
             <TabsTrigger value="unsplash">Unsplash</TabsTrigger>
             <TabsTrigger value="url">URL diretto</TabsTrigger>
           </TabsList>
 
-          {productImages.length > 0 && (
-            <TabsContent value="products" className="flex-1 overflow-y-auto mt-3">
-              <div className="grid grid-cols-3 gap-3">
-                {productImages.map((img, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSelect(img.url, img.title)}
-                    className="group relative rounded-lg overflow-hidden border hover:border-primary transition-colors aspect-square"
-                  >
-                    <img src={img.url} alt={img.title} className="w-full h-full object-cover" />
-                    <div className="absolute inset-x-0 bottom-0 bg-black/70 px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <p className="text-white text-xs truncate">{img.title}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </TabsContent>
-          )}
+          <TabsContent value="shopify" className="flex-1 overflow-hidden flex flex-col mt-3">
+            <div className="shrink-0 mb-3">
+              <Input
+                value={shopifyFilter}
+                onChange={(e) => setShopifyFilter(e.target.value)}
+                placeholder="Filtra per nome prodotto..."
+                className="w-full"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {loadingShopify ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-sm text-muted-foreground">Caricamento immagini Shopify...</span>
+                </div>
+              ) : filteredShopify.length > 0 ? (
+                <div className="grid grid-cols-3 gap-3">
+                  {filteredShopify.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleSelect(img.url, img.title)}
+                      className="group relative rounded-lg overflow-hidden border hover:border-primary transition-colors aspect-square"
+                    >
+                      <img src={img.url} alt={img.title} className="w-full h-full object-cover" />
+                      <div className="absolute inset-x-0 bottom-0 bg-black/70 px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p className="text-white text-xs truncate">{img.title}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">Nessuna immagine trovata</p>
+              )}
+            </div>
+          </TabsContent>
 
           <TabsContent value="unsplash" className="flex-1 overflow-hidden flex flex-col mt-3">
             <div className="flex gap-2 shrink-0 mb-3">
