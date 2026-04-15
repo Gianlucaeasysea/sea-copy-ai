@@ -340,6 +340,7 @@ ${isSequence
           model: "claude-sonnet-4-6",
           max_tokens: isSequence ? 6000 : 2048,
           stream: true,
+          temperature: 0.9,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
         }),
