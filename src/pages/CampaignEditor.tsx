@@ -783,9 +783,6 @@ export default function CampaignEditor() {
             setEditBody(editBody + md);
           }
         }}
-        productImages={editorProducts
-          .filter((p) => p.image_url)
-          .map((p) => ({ url: p.image_url!, title: p.title }))}
       />
     </div>
   );
