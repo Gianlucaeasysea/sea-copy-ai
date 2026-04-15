@@ -344,9 +344,63 @@ export default function CampaignEditor() {
   const handlePushToKlaviyo = async () => {
     if (!campaign) return;
 
-    // Canva — apre brief senza chiamare Klaviyo
+    // Canva — push via API
     if (outputFormat === "canva") {
-      setCanvaOpen(true);
+      setPushingCanva(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("push-to-canva", {
+          body: {
+            campaign_id: campaign.id,
+            subject_line: subjectLine,
+            body_markdown: editBody,
+            products: editorProducts,
+            hero_image_url: campaign.hero_image_url,
+          },
+        });
+        if (error) throw error;
+        if (data?.edit_url) {
+          window.open(data.edit_url, "_blank");
+          toast.success("Design creato in Canva!");
+        } else {
+          toast.success("Design inviato a Canva");
+        }
+      } catch (e: any) {
+        toast.error("Canva push fallito: " + (e?.message || "errore"));
+      } finally {
+        setPushingCanva(false);
+      }
+      return;
+    }
+
+    // Template with Unlayer — export HTML first
+    if (outputFormat === "template" && unlayerRef.current) {
+      setPushingKlaviyo(true);
+      try {
+        const { html, design } = await unlayerRef.current.exportHtml();
+        const { data, error } = await supabase.functions.invoke("push-to-klaviyo", {
+          body: {
+            campaign_id: campaign.id,
+            output_format: "template",
+            branded_style: false,
+            custom_html: html,
+          },
+        });
+        if (error) throw error;
+        toast.success(
+          <span>
+            Template salvato in Klaviyo!{" "}
+            {data?.klaviyo_url && (
+              <a href={data.klaviyo_url} target="_blank" rel="noopener noreferrer" className="underline">
+                Vedi template →
+              </a>
+            )}
+          </span>
+        );
+      } catch (e: any) {
+        toast.error("Klaviyo push fallito: " + (e?.message || "errore"));
+      } finally {
+        setPushingKlaviyo(false);
+      }
       return;
     }
 
@@ -361,18 +415,7 @@ export default function CampaignEditor() {
       });
       if (error) throw error;
 
-      if (outputFormat === "template") {
-        toast.success(
-          <span>
-            Template salvato in Klaviyo!{" "}
-            {data?.klaviyo_url && (
-              <a href={data.klaviyo_url} target="_blank" rel="noopener noreferrer" className="underline">
-                Vedi template →
-              </a>
-            )}
-          </span>
-        );
-      } else if (data?.klaviyo_url) {
+      if (data?.klaviyo_url) {
         toast.success(
           <span>
             Pushato su Klaviyo!{" "}
