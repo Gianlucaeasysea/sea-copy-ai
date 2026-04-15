@@ -376,6 +376,8 @@ ${isSequence
         ],
         stream: true,
         max_tokens: isSequence ? 6000 : 2048,
+        temperature: 1.1,
+        top_p: 0.95,
       }),
     });
 
