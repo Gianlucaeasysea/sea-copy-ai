@@ -397,13 +397,19 @@ export default function CampaignEditor() {
     if (!campaign) return;
     setDuplicating(true);
     try {
+      // Include source text so generate-copy can translate instead of rewriting
+      const sourceBody = editBody || campaign.body_markdown || "";
+      const sourceSubject = subjectLine || campaign.subject_line || "";
+      const sourcePreview = previewText || campaign.preview_text || "";
+      const sourceWhatsapp = whatsapp || campaign.whatsapp_copy || "";
+
       const { data, error } = await supabase.from("campaigns").insert({
         name: `${campaign.name} (${duplicateLanguage.toUpperCase()})`,
         type: campaign.type,
         language: duplicateLanguage,
         framework: campaign.framework,
         subject_tone: campaign.subject_tone,
-        context_notes: campaign.context_notes,
+        context_notes: `[TRANSLATE FROM ${campaign.language.toUpperCase()}]\n---SOURCE_SUBJECT---\n${sourceSubject}\n---SOURCE_PREVIEW---\n${sourcePreview}\n---SOURCE_BODY---\n${sourceBody}\n---SOURCE_WHATSAPP---\n${sourceWhatsapp}\n---END_SOURCE---\n${campaign.context_notes || ""}`,
         shopify_product_ids: campaign.shopify_product_ids,
         products_data: campaign.products_data,
         hero_image_url: campaign.hero_image_url,
@@ -493,7 +499,7 @@ export default function CampaignEditor() {
             size="sm"
             variant="outline"
             onClick={handlePushToKlaviyo}
-            disabled={pushingKlaviyo || !campaign?.subject_line}
+            disabled={pushingKlaviyo || !subjectLine}
           >
             <Send className="mr-1 h-3 w-3" />
             {pushingKlaviyo ? "Pushing..." : "→ Klaviyo"}
