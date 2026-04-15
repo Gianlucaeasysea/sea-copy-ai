@@ -690,37 +690,51 @@ export default function CampaignEditor() {
 
       {/* Split view */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: Editable */}
-        <div className="flex-1 border-r overflow-auto p-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Badge variant="secondary" className="text-xs">Editable</Badge>
-            <Badge variant="outline" className="text-xs">{campaign.framework}</Badge>
-            {isSequence && (
-              <Badge variant="outline" className="text-xs bg-teal-50 text-teal-700 border-teal-200">
-                {parsedEmails.length} email
-              </Badge>
-            )}
-            <div className="ml-auto">
-              <Button size="sm" variant="ghost" onClick={() => setImageInserterOpen(true)}>
-                <ImageIcon className="mr-1 h-3 w-3" /> Inserisci immagine
-              </Button>
-            </div>
-          </div>
-          <Textarea
-            ref={editorRef}
-            value={editBody}
-            onChange={(e) => setEditBody(e.target.value)}
-            className="min-h-[400px] font-mono text-sm resize-none border-0 focus-visible:ring-0 p-0"
-            placeholder="Generated copy will appear here for editing..."
-          />
-          {whatsapp && (
-            <div className="mt-6 pt-4 border-t">
-              <Label className="text-xs text-muted-foreground mb-2 block">WhatsApp Version</Label>
-              <Textarea
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                className="font-mono text-sm min-h-[100px]"
+        {/* Left: Editable or Block Editor */}
+        <div className="flex-1 border-r overflow-auto flex flex-col">
+          {outputFormat === "template" ? (
+            /* Unlayer block editor */
+            <div className="flex-1 min-h-0">
+              <UnlayerEditor
+                ref={unlayerRef}
+                initialBody={editBody}
+                onReady={() => toast.info("Block editor pronto")}
               />
+            </div>
+          ) : (
+            /* Standard markdown editor */
+            <div className="p-6 flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <Badge variant="secondary" className="text-xs">Editable</Badge>
+                <Badge variant="outline" className="text-xs">{campaign.framework}</Badge>
+                {isSequence && (
+                  <Badge variant="outline" className="text-xs bg-accent/20 text-accent-foreground border-accent/40">
+                    {parsedEmails.length} email
+                  </Badge>
+                )}
+                <div className="ml-auto">
+                  <Button size="sm" variant="ghost" onClick={() => setImageInserterOpen(true)}>
+                    <ImageIcon className="mr-1 h-3 w-3" /> Inserisci immagine
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                ref={editorRef}
+                value={editBody}
+                onChange={(e) => setEditBody(e.target.value)}
+                className="min-h-[400px] font-mono text-sm resize-none border-0 focus-visible:ring-0 p-0"
+                placeholder="Generated copy will appear here for editing..."
+              />
+              {whatsapp && (
+                <div className="mt-6 pt-4 border-t">
+                  <Label className="text-xs text-muted-foreground mb-2 block">WhatsApp Version</Label>
+                  <Textarea
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    className="font-mono text-sm min-h-[100px]"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
