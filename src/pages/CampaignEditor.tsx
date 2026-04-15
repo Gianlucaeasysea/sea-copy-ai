@@ -594,8 +594,14 @@ export default function CampaignEditor() {
                 {parsedEmails.length} email
               </Badge>
             )}
+            <div className="ml-auto">
+              <Button size="sm" variant="ghost" onClick={() => setImageInserterOpen(true)}>
+                <ImageIcon className="mr-1 h-3 w-3" /> Inserisci immagine
+              </Button>
+            </div>
           </div>
           <Textarea
+            ref={editorRef}
             value={editBody}
             onChange={(e) => setEditBody(e.target.value)}
             className="min-h-[400px] font-mono text-sm resize-none border-0 focus-visible:ring-0 p-0"
