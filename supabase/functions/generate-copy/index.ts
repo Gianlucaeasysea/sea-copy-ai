@@ -277,16 +277,51 @@ ${outputFormat}`;
       productContext += `\n\nFEATURED COLLECTION: ${campaign.collection_name}`;
     }
 
-    const userPrompt = `Campaign: "${campaign.name}"
+    // Detect translation mode from context_notes
+    const translateMatch = campaign.context_notes?.match(/\[TRANSLATE FROM (\w+)\]\n---SOURCE_SUBJECT---\n([\s\S]*?)\n---SOURCE_PREVIEW---\n([\s\S]*?)\n---SOURCE_BODY---\n([\s\S]*?)\n---SOURCE_WHATSAPP---\n([\s\S]*?)\n---END_SOURCE---/);
+    
+    let userPrompt: string;
+    if (translateMatch) {
+      const sourceLang = translateMatch[1];
+      const sourceSubject = translateMatch[2].trim();
+      const sourcePreview = translateMatch[3].trim();
+      const sourceBody = translateMatch[4].trim();
+      const sourceWhatsapp = translateMatch[5].trim();
+      const extraNotes = campaign.context_notes?.split("---END_SOURCE---")[1]?.trim() || "";
+
+      userPrompt = `TRANSLATION TASK — Translate the following email from ${sourceLang} to ${campaign.language === "it" ? "Italian" : "English"}.
+
+IMPORTANT: This is a TRANSLATION, NOT a rewrite. Keep the same structure, meaning, tone and formatting. Only change the language. Adapt idioms and expressions naturally but preserve the original intent.
+
+SOURCE EMAIL:
+
+## Subject Line
+${sourceSubject}
+
+## Preview Text
+${sourcePreview}
+
+## Email Body
+${sourceBody}
+
+## WhatsApp Version
+${sourceWhatsapp}
+
+${extraNotes ? `Additional context: ${extraNotes}` : ""}
+
+Now output the TRANSLATED version using the same section format (## Subject Line, ## Preview Text, ## Email Body, ## WhatsApp Version).`;
+    } else {
+      userPrompt = `Campaign: "${campaign.name}"
 Type: ${campaign.type}
 ${campaign.context_notes ? `Context: ${campaign.context_notes}` : ""}
 ${productContext}
 
 ${isSequence
-  ? `Generate the complete ${sequenceEmails.length}-email sequence. Follow these exact roles:\n` +
-    sequenceEmails.map((role, i) => `${i + 1}. ${role}`).join("\n")
+  ? `Generate the complete ${sequenceEmails!.length}-email sequence. Follow these exact roles:\n` +
+    sequenceEmails!.map((role, i) => `${i + 1}. ${role}`).join("\n")
   : "Generate the email and WhatsApp copy now."
 }`;
+    }
 
     const claudeApiKey = settings.claude_api_key;
 
