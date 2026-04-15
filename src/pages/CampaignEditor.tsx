@@ -14,6 +14,7 @@ import EmailPreview from "@/components/EmailPreview";
 import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
 import ProductElementPicker, { ProductElements } from "@/components/ProductElementPicker";
 import HeroImageCreator from "@/components/HeroImageCreator";
+import ImageInserter from "@/components/ImageInserter";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -94,6 +95,8 @@ export default function CampaignEditor() {
   const [elementPickerProduct, setElementPickerProduct] = useState<ShopifyProduct | null>(null);
   const [heroCreatorOpen, setHeroCreatorOpen] = useState(false);
   const [brandedStyle, setBrandedStyle] = useState(false);
+  const [imageInserterOpen, setImageInserterOpen] = useState(false);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
 
   // Sequence state
   const [parsedEmails, setParsedEmails] = useState<ParsedEmail[]>([]);
