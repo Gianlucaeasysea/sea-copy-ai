@@ -573,19 +573,19 @@ export default function CampaignEditor() {
             size="sm"
             variant="outline"
             onClick={handlePushToKlaviyo}
-            disabled={pushingKlaviyo || !subjectLine}
+            disabled={pushingKlaviyo || pushingCanva || !subjectLine}
           >
             {outputFormat === "canva" ? (
               <Palette className="mr-1 h-3 w-3" />
             ) : (
               <Send className="mr-1 h-3 w-3" />
             )}
-            {pushingKlaviyo
+            {pushingKlaviyo || pushingCanva
               ? "Pushing..."
               : outputFormat === "canva"
-              ? "Brief Canva"
+              ? "→ Canva"
               : outputFormat === "template"
-              ? "→ Salva template"
+              ? "→ Klaviyo Template"
               : "→ Klaviyo"}
           </Button>
           <Button
