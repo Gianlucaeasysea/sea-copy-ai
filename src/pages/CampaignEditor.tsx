@@ -529,8 +529,18 @@ export default function CampaignEditor() {
             onClick={handlePushToKlaviyo}
             disabled={pushingKlaviyo || !subjectLine}
           >
-            <Send className="mr-1 h-3 w-3" />
-            {pushingKlaviyo ? "Pushing..." : "→ Klaviyo"}
+            {outputFormat === "canva" ? (
+              <Palette className="mr-1 h-3 w-3" />
+            ) : (
+              <Send className="mr-1 h-3 w-3" />
+            )}
+            {pushingKlaviyo
+              ? "Pushing..."
+              : outputFormat === "canva"
+              ? "Brief Canva"
+              : outputFormat === "template"
+              ? "→ Salva template"
+              : "→ Klaviyo"}
           </Button>
           <Button
             size="sm"
@@ -540,6 +550,31 @@ export default function CampaignEditor() {
             <Copy className="mr-1 h-3 w-3" />
             Duplica
           </Button>
+        </div>
+        {/* Output format selector */}
+        <div className="flex items-center gap-2 flex-wrap mt-2">
+          <span className="text-xs text-muted-foreground font-medium">Formato:</span>
+          {(
+            [
+              { value: "html_dark",  label: "HTML dark",   icon: Moon       },
+              { value: "html_light", label: "HTML light",  icon: Sun        },
+              { value: "plaintext",  label: "Plain text",  icon: FileText   },
+              { value: "template",   label: "Template",    icon: LayoutTemplate },
+              { value: "canva",      label: "Canva",       icon: Palette    },
+            ] as const
+          ).map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => setOutputFormat(value)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all
+                ${outputFormat === value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"}`}
+            >
+              <Icon className="h-3 w-3" />
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
