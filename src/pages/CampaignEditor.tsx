@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X, ImageIcon } from "lucide-react";
+import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X, ImageIcon, FileText, Moon, Sun, LayoutTemplate, Palette } from "lucide-react";
+import CanvaBrief from "@/components/CanvaBrief";
 import EmailPreview from "@/components/EmailPreview";
 import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
 import ProductElementPicker, { ProductElements } from "@/components/ProductElementPicker";
@@ -94,7 +95,8 @@ export default function CampaignEditor() {
   const [productElements, setProductElements] = useState<Record<string, ProductElements>>({});
   const [elementPickerProduct, setElementPickerProduct] = useState<ShopifyProduct | null>(null);
   const [heroCreatorOpen, setHeroCreatorOpen] = useState(false);
-  const [brandedStyle, setBrandedStyle] = useState(false);
+  const [outputFormat, setOutputFormat] = useState<"html_dark" | "html_light" | "plaintext" | "template" | "canva">("html_dark");
+  const [canvaOpen, setCanvaOpen] = useState(false);
   const [imageInserterOpen, setImageInserterOpen] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
@@ -338,26 +340,49 @@ export default function CampaignEditor() {
 
   const handlePushToKlaviyo = async () => {
     if (!campaign) return;
+
+    // Canva — apre brief senza chiamare Klaviyo
+    if (outputFormat === "canva") {
+      setCanvaOpen(true);
+      return;
+    }
+
     setPushingKlaviyo(true);
     try {
       const { data, error } = await supabase.functions.invoke("push-to-klaviyo", {
-        body: { campaign_id: campaign.id, branded_style: brandedStyle },
+        body: {
+          campaign_id: campaign.id,
+          output_format: outputFormat,
+          branded_style: outputFormat === "html_dark",
+        },
       });
       if (error) throw error;
-      if (data?.klaviyo_url) {
+
+      if (outputFormat === "template") {
         toast.success(
           <span>
-            Pushed to Klaviyo!{" "}
+            Template salvato in Klaviyo!{" "}
+            {data?.klaviyo_url && (
+              <a href={data.klaviyo_url} target="_blank" rel="noopener noreferrer" className="underline">
+                Vedi template →
+              </a>
+            )}
+          </span>
+        );
+      } else if (data?.klaviyo_url) {
+        toast.success(
+          <span>
+            Pushato su Klaviyo!{" "}
             <a href={data.klaviyo_url} target="_blank" rel="noopener noreferrer" className="underline">
-              Open in Klaviyo →
+              Apri in Klaviyo →
             </a>
           </span>
         );
       } else {
-        toast.success("Campaign pushed to Klaviyo as draft");
+        toast.success("Campaign creata su Klaviyo come draft");
       }
     } catch (e: any) {
-      toast.error("Klaviyo push failed: " + (e?.message || "unknown error"));
+      toast.error("Klaviyo push fallito: " + (e?.message || "errore sconosciuto"));
     } finally {
       setPushingKlaviyo(false);
     }
