@@ -291,7 +291,7 @@ serve(async (req) => {
         data: {
           type: "template",
           attributes: {
-            name: `[EasyCopy] ${campaign.name} — ${new Date().toLocaleDateString("it-IT")}`,
+            name: `${(campaign.language || "it").toUpperCase()} | [EasyCopy] ${campaign.name} — ${new Date().toLocaleDateString("it-IT")}`,
             html: brandedHtml,
             editor_type: "CODE",
           },
@@ -335,7 +335,7 @@ serve(async (req) => {
       data: {
         type: "campaign",
         attributes: {
-          name: `[EasyCopy] ${campaign.name} — ${new Date().toLocaleDateString("it-IT")}`,
+          name: `${(campaign.language || "it").toUpperCase()} | [EasyCopy] ${campaign.name} — ${new Date().toLocaleDateString("it-IT")}`,
           audiences: {
             included: [audienceListId],
           },
