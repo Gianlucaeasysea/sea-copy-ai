@@ -36,6 +36,7 @@ function renderMarkdownToHtml(md: string, dark = false): string {
     .replace(/^[-*] (.+)$/gm, `<li style="margin:6px 0;font-family:Inter,Arial,sans-serif;font-size:15px;color:${bodyColor};line-height:1.7">$1</li>`)
     .replace(/(<li[^>]*>.*<\/li>)/gs, '<ul style="padding-left:20px;margin:14px 0">$1</ul>')
     .replace(/→ (.+)/g, `<a href="#" style="display:inline-block;background:${ctaBg};color:#ffffff;padding:12px 28px;border-radius:8px;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin:12px 0;letter-spacing:0.3px">→ $1</a>`)
+    .replace(/!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)/g, '<img src="$2" alt="$1" style="display:block;max-width:100%;margin:16px 0;border-radius:8px" />')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, `<a href="$2" style="color:${linkColor};text-decoration:underline">$1</a>`)
     .replace(/\n\n/g, `</p><p style="margin:14px 0;line-height:1.7;color:${bodyColor};font-family:Inter,Arial,sans-serif;font-size:15px">`)
     .replace(/^(?!<[huap])/, `<p style="margin:14px 0;line-height:1.7;color:${bodyColor};font-family:Inter,Arial,sans-serif;font-size:15px">`)
