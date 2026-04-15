@@ -309,26 +309,16 @@ serve(async (req) => {
     const templateId = templateData?.data?.id;
     console.log("Created Klaviyo template:", templateId);
 
-    // 3. Get Klaviyo list for audiences
-    const listId = settings.klaviyo_list_id;
-    let audienceListId = listId;
-    if (!audienceListId) {
-      // Fetch first available list from Klaviyo
-      const listsRes = await fetch("https://a.klaviyo.com/api/lists/", { headers });
-      console.log("Klaviyo lists response status:", listsRes.status);
-      if (listsRes.ok) {
-        const listsData = await listsRes.json();
-        console.log("Klaviyo lists count:", listsData?.data?.length, "first:", listsData?.data?.[0]?.id);
-        audienceListId = listsData?.data?.[0]?.id;
-      } else {
-        const listsErr = await listsRes.text();
-        console.error("Klaviyo lists error:", listsRes.status, listsErr);
-      }
+    // 3. Get first Klaviyo list for audiences (user will set the real list in Klaviyo)
+    const listsRes = await fetch("https://a.klaviyo.com/api/lists/", { headers });
+    let audienceListId: string | undefined;
+    if (listsRes.ok) {
+      const listsData = await listsRes.json();
+      audienceListId = listsData?.data?.[0]?.id;
     }
     if (!audienceListId) {
-      throw new Error("No Klaviyo list found. Configure 'klaviyo_list_id' in Brand Settings or create a list in Klaviyo.");
+      throw new Error("No Klaviyo list found. Create at least one list in Klaviyo.");
     }
-    console.log("Using Klaviyo list:", audienceListId);
 
     // 4. Create campaign
     const campaignPayload = {
