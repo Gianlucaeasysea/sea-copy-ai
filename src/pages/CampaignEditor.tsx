@@ -844,6 +844,19 @@ export default function CampaignEditor() {
           }
         }}
       />
+
+      {/* Canva brief modal */}
+      <CanvaBrief
+        open={canvaOpen}
+        onClose={() => setCanvaOpen(false)}
+        campaignName={campaign?.name || ""}
+        subjectLine={subjectLine}
+        previewText={previewText}
+        bodyMarkdown={editBody}
+        whatsappCopy={whatsapp}
+        products={editorProducts.length > 0 ? editorProducts : (campaign?.products_data as any[] || [])}
+        heroImageUrl={campaign?.hero_image_url}
+      />
     </div>
   );
 }
