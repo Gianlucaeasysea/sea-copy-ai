@@ -768,6 +768,25 @@ export default function CampaignEditor() {
           setCampaign((c: any) => ({ ...c, hero_image_url: url }));
         }}
       />
+
+      {/* Image Inserter */}
+      <ImageInserter
+        open={imageInserterOpen}
+        onClose={() => setImageInserterOpen(false)}
+        onInsert={(md) => {
+          const textarea = editorRef.current;
+          if (textarea) {
+            const pos = textarea.selectionStart || editBody.length;
+            const newBody = editBody.slice(0, pos) + md + editBody.slice(pos);
+            setEditBody(newBody);
+          } else {
+            setEditBody(editBody + md);
+          }
+        }}
+        productImages={editorProducts
+          .filter((p) => p.image_url)
+          .map((p) => ({ url: p.image_url!, title: p.title }))}
+      />
     </div>
   );
 }
