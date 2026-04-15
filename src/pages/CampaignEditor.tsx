@@ -9,13 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X, ImageIcon, FileText, Moon, Sun, LayoutTemplate, Palette } from "lucide-react";
+import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X, ImageIcon, FileText, Moon, Sun, LayoutTemplate, Palette, Download } from "lucide-react";
 import CanvaBrief from "@/components/CanvaBrief";
 import EmailPreview from "@/components/EmailPreview";
 import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
 import ProductElementPicker, { ProductElements } from "@/components/ProductElementPicker";
 import HeroImageCreator from "@/components/HeroImageCreator";
 import ImageInserter from "@/components/ImageInserter";
+import UnlayerEditor, { UnlayerEditorHandle } from "@/components/UnlayerEditor";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -98,6 +99,8 @@ export default function CampaignEditor() {
   const [outputFormat, setOutputFormat] = useState<"html_dark" | "html_light" | "plaintext" | "template" | "canva">("html_dark");
   const [canvaOpen, setCanvaOpen] = useState(false);
   const [imageInserterOpen, setImageInserterOpen] = useState(false);
+  const [pushingCanva, setPushingCanva] = useState(false);
+  const unlayerRef = useRef<UnlayerEditorHandle>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
   // Sequence state
