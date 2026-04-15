@@ -9,13 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X, ImageIcon, FileText, Moon, Sun, LayoutTemplate, Palette } from "lucide-react";
+import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X, ImageIcon, FileText, Moon, Sun, LayoutTemplate, Palette, Download } from "lucide-react";
 import CanvaBrief from "@/components/CanvaBrief";
 import EmailPreview from "@/components/EmailPreview";
 import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
 import ProductElementPicker, { ProductElements } from "@/components/ProductElementPicker";
 import HeroImageCreator from "@/components/HeroImageCreator";
 import ImageInserter from "@/components/ImageInserter";
+import UnlayerEditor, { UnlayerEditorHandle } from "@/components/UnlayerEditor";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -98,6 +99,8 @@ export default function CampaignEditor() {
   const [outputFormat, setOutputFormat] = useState<"html_dark" | "html_light" | "plaintext" | "template" | "canva">("html_dark");
   const [canvaOpen, setCanvaOpen] = useState(false);
   const [imageInserterOpen, setImageInserterOpen] = useState(false);
+  const [pushingCanva, setPushingCanva] = useState(false);
+  const unlayerRef = useRef<UnlayerEditorHandle>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
   // Sequence state
@@ -341,9 +344,63 @@ export default function CampaignEditor() {
   const handlePushToKlaviyo = async () => {
     if (!campaign) return;
 
-    // Canva — apre brief senza chiamare Klaviyo
+    // Canva — push via API
     if (outputFormat === "canva") {
-      setCanvaOpen(true);
+      setPushingCanva(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("push-to-canva", {
+          body: {
+            campaign_id: campaign.id,
+            subject_line: subjectLine,
+            body_markdown: editBody,
+            products: editorProducts,
+            hero_image_url: campaign.hero_image_url,
+          },
+        });
+        if (error) throw error;
+        if (data?.edit_url) {
+          window.open(data.edit_url, "_blank");
+          toast.success("Design creato in Canva!");
+        } else {
+          toast.success("Design inviato a Canva");
+        }
+      } catch (e: any) {
+        toast.error("Canva push fallito: " + (e?.message || "errore"));
+      } finally {
+        setPushingCanva(false);
+      }
+      return;
+    }
+
+    // Template with Unlayer — export HTML first
+    if (outputFormat === "template" && unlayerRef.current) {
+      setPushingKlaviyo(true);
+      try {
+        const { html, design } = await unlayerRef.current.exportHtml();
+        const { data, error } = await supabase.functions.invoke("push-to-klaviyo", {
+          body: {
+            campaign_id: campaign.id,
+            output_format: "template",
+            branded_style: false,
+            custom_html: html,
+          },
+        });
+        if (error) throw error;
+        toast.success(
+          <span>
+            Template salvato in Klaviyo!{" "}
+            {data?.klaviyo_url && (
+              <a href={data.klaviyo_url} target="_blank" rel="noopener noreferrer" className="underline">
+                Vedi template →
+              </a>
+            )}
+          </span>
+        );
+      } catch (e: any) {
+        toast.error("Klaviyo push fallito: " + (e?.message || "errore"));
+      } finally {
+        setPushingKlaviyo(false);
+      }
       return;
     }
 
@@ -358,18 +415,7 @@ export default function CampaignEditor() {
       });
       if (error) throw error;
 
-      if (outputFormat === "template") {
-        toast.success(
-          <span>
-            Template salvato in Klaviyo!{" "}
-            {data?.klaviyo_url && (
-              <a href={data.klaviyo_url} target="_blank" rel="noopener noreferrer" className="underline">
-                Vedi template →
-              </a>
-            )}
-          </span>
-        );
-      } else if (data?.klaviyo_url) {
+      if (data?.klaviyo_url) {
         toast.success(
           <span>
             Pushato su Klaviyo!{" "}
@@ -527,19 +573,19 @@ export default function CampaignEditor() {
             size="sm"
             variant="outline"
             onClick={handlePushToKlaviyo}
-            disabled={pushingKlaviyo || !subjectLine}
+            disabled={pushingKlaviyo || pushingCanva || !subjectLine}
           >
             {outputFormat === "canva" ? (
               <Palette className="mr-1 h-3 w-3" />
             ) : (
               <Send className="mr-1 h-3 w-3" />
             )}
-            {pushingKlaviyo
+            {pushingKlaviyo || pushingCanva
               ? "Pushing..."
               : outputFormat === "canva"
-              ? "Brief Canva"
+              ? "→ Canva"
               : outputFormat === "template"
-              ? "→ Salva template"
+              ? "→ Klaviyo Template"
               : "→ Klaviyo"}
           </Button>
           <Button
@@ -644,37 +690,51 @@ export default function CampaignEditor() {
 
       {/* Split view */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: Editable */}
-        <div className="flex-1 border-r overflow-auto p-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Badge variant="secondary" className="text-xs">Editable</Badge>
-            <Badge variant="outline" className="text-xs">{campaign.framework}</Badge>
-            {isSequence && (
-              <Badge variant="outline" className="text-xs bg-teal-50 text-teal-700 border-teal-200">
-                {parsedEmails.length} email
-              </Badge>
-            )}
-            <div className="ml-auto">
-              <Button size="sm" variant="ghost" onClick={() => setImageInserterOpen(true)}>
-                <ImageIcon className="mr-1 h-3 w-3" /> Inserisci immagine
-              </Button>
-            </div>
-          </div>
-          <Textarea
-            ref={editorRef}
-            value={editBody}
-            onChange={(e) => setEditBody(e.target.value)}
-            className="min-h-[400px] font-mono text-sm resize-none border-0 focus-visible:ring-0 p-0"
-            placeholder="Generated copy will appear here for editing..."
-          />
-          {whatsapp && (
-            <div className="mt-6 pt-4 border-t">
-              <Label className="text-xs text-muted-foreground mb-2 block">WhatsApp Version</Label>
-              <Textarea
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                className="font-mono text-sm min-h-[100px]"
+        {/* Left: Editable or Block Editor */}
+        <div className="flex-1 border-r overflow-auto flex flex-col">
+          {outputFormat === "template" ? (
+            /* Unlayer block editor */
+            <div className="flex-1 min-h-0">
+              <UnlayerEditor
+                ref={unlayerRef}
+                initialBody={editBody}
+                onReady={() => toast.info("Block editor pronto")}
               />
+            </div>
+          ) : (
+            /* Standard markdown editor */
+            <div className="p-6 flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <Badge variant="secondary" className="text-xs">Editable</Badge>
+                <Badge variant="outline" className="text-xs">{campaign.framework}</Badge>
+                {isSequence && (
+                  <Badge variant="outline" className="text-xs bg-accent/20 text-accent-foreground border-accent/40">
+                    {parsedEmails.length} email
+                  </Badge>
+                )}
+                <div className="ml-auto">
+                  <Button size="sm" variant="ghost" onClick={() => setImageInserterOpen(true)}>
+                    <ImageIcon className="mr-1 h-3 w-3" /> Inserisci immagine
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                ref={editorRef}
+                value={editBody}
+                onChange={(e) => setEditBody(e.target.value)}
+                className="min-h-[400px] font-mono text-sm resize-none border-0 focus-visible:ring-0 p-0"
+                placeholder="Generated copy will appear here for editing..."
+              />
+              {whatsapp && (
+                <div className="mt-6 pt-4 border-t">
+                  <Label className="text-xs text-muted-foreground mb-2 block">WhatsApp Version</Label>
+                  <Textarea
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    className="font-mono text-sm min-h-[100px]"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
