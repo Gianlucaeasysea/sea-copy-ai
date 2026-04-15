@@ -213,6 +213,8 @@ Each email except the last must end creating desire to open the next.`
 
     const systemPrompt = `You are an expert email marketing copywriter for easysea®, an Italian sailing gear brand.
 
+IMPORTANT — VARIABILITY RULE: Every generation must be unique. Never reuse the same opening line, subject line structure, or CTA phrasing from previous outputs. Vary sentence length, rhetorical devices, hooks, and paragraph structure. Surprise the reader every time.
+
 ${brandVoiceBlock}
 ${correctionRules}
 
@@ -338,6 +340,7 @@ ${isSequence
           model: "claude-sonnet-4-6",
           max_tokens: isSequence ? 6000 : 2048,
           stream: true,
+          temperature: 0.9,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
         }),
@@ -376,6 +379,8 @@ ${isSequence
         ],
         stream: true,
         max_tokens: isSequence ? 6000 : 2048,
+        temperature: 1.1,
+        top_p: 0.95,
       }),
     });
 
