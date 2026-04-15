@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X, ImageIcon } from "lucide-react";
+import { RefreshCw, Check, Save, Send, Pencil, Trash2, Copy, ShoppingBag, X, ImageIcon, FileText, Moon, Sun, LayoutTemplate, Palette } from "lucide-react";
+import CanvaBrief from "@/components/CanvaBrief";
 import EmailPreview from "@/components/EmailPreview";
 import ProductPicker, { ShopifyProduct, ShopifyCollection } from "@/components/ProductPicker";
 import ProductElementPicker, { ProductElements } from "@/components/ProductElementPicker";
@@ -94,7 +95,8 @@ export default function CampaignEditor() {
   const [productElements, setProductElements] = useState<Record<string, ProductElements>>({});
   const [elementPickerProduct, setElementPickerProduct] = useState<ShopifyProduct | null>(null);
   const [heroCreatorOpen, setHeroCreatorOpen] = useState(false);
-  const [brandedStyle, setBrandedStyle] = useState(false);
+  const [outputFormat, setOutputFormat] = useState<"html_dark" | "html_light" | "plaintext" | "template" | "canva">("html_dark");
+  const [canvaOpen, setCanvaOpen] = useState(false);
   const [imageInserterOpen, setImageInserterOpen] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
@@ -338,26 +340,49 @@ export default function CampaignEditor() {
 
   const handlePushToKlaviyo = async () => {
     if (!campaign) return;
+
+    // Canva — apre brief senza chiamare Klaviyo
+    if (outputFormat === "canva") {
+      setCanvaOpen(true);
+      return;
+    }
+
     setPushingKlaviyo(true);
     try {
       const { data, error } = await supabase.functions.invoke("push-to-klaviyo", {
-        body: { campaign_id: campaign.id, branded_style: brandedStyle },
+        body: {
+          campaign_id: campaign.id,
+          output_format: outputFormat,
+          branded_style: outputFormat === "html_dark",
+        },
       });
       if (error) throw error;
-      if (data?.klaviyo_url) {
+
+      if (outputFormat === "template") {
         toast.success(
           <span>
-            Pushed to Klaviyo!{" "}
+            Template salvato in Klaviyo!{" "}
+            {data?.klaviyo_url && (
+              <a href={data.klaviyo_url} target="_blank" rel="noopener noreferrer" className="underline">
+                Vedi template →
+              </a>
+            )}
+          </span>
+        );
+      } else if (data?.klaviyo_url) {
+        toast.success(
+          <span>
+            Pushato su Klaviyo!{" "}
             <a href={data.klaviyo_url} target="_blank" rel="noopener noreferrer" className="underline">
-              Open in Klaviyo →
+              Apri in Klaviyo →
             </a>
           </span>
         );
       } else {
-        toast.success("Campaign pushed to Klaviyo as draft");
+        toast.success("Campaign creata su Klaviyo come draft");
       }
     } catch (e: any) {
-      toast.error("Klaviyo push failed: " + (e?.message || "unknown error"));
+      toast.error("Klaviyo push fallito: " + (e?.message || "errore sconosciuto"));
     } finally {
       setPushingKlaviyo(false);
     }
@@ -504,8 +529,18 @@ export default function CampaignEditor() {
             onClick={handlePushToKlaviyo}
             disabled={pushingKlaviyo || !subjectLine}
           >
-            <Send className="mr-1 h-3 w-3" />
-            {pushingKlaviyo ? "Pushing..." : "→ Klaviyo"}
+            {outputFormat === "canva" ? (
+              <Palette className="mr-1 h-3 w-3" />
+            ) : (
+              <Send className="mr-1 h-3 w-3" />
+            )}
+            {pushingKlaviyo
+              ? "Pushing..."
+              : outputFormat === "canva"
+              ? "Brief Canva"
+              : outputFormat === "template"
+              ? "→ Salva template"
+              : "→ Klaviyo"}
           </Button>
           <Button
             size="sm"
@@ -515,6 +550,31 @@ export default function CampaignEditor() {
             <Copy className="mr-1 h-3 w-3" />
             Duplica
           </Button>
+        </div>
+        {/* Output format selector */}
+        <div className="flex items-center gap-2 flex-wrap mt-2">
+          <span className="text-xs text-muted-foreground font-medium">Formato:</span>
+          {(
+            [
+              { value: "html_dark",  label: "HTML dark",   icon: Moon       },
+              { value: "html_light", label: "HTML light",  icon: Sun        },
+              { value: "plaintext",  label: "Plain text",  icon: FileText   },
+              { value: "template",   label: "Template",    icon: LayoutTemplate },
+              { value: "canva",      label: "Canva",       icon: Palette    },
+            ] as const
+          ).map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => setOutputFormat(value)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all
+                ${outputFormat === value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"}`}
+            >
+              <Icon className="h-3 w-3" />
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -629,8 +689,8 @@ export default function CampaignEditor() {
             heroImageUrl={(campaign as any)?.hero_image_url}
             products={editorProducts.length > 0 ? editorProducts : ((campaign as any)?.products_data as any[] || [])}
             language={campaign?.language}
-            branded={brandedStyle}
-            onBrandedChange={setBrandedStyle}
+            branded={outputFormat === "html_dark"}
+            onBrandedChange={(v) => setOutputFormat(v ? "html_dark" : "html_light")}
           />
         </div>
       </div>
@@ -783,6 +843,19 @@ export default function CampaignEditor() {
             setEditBody(editBody + md);
           }
         }}
+      />
+
+      {/* Canva brief modal */}
+      <CanvaBrief
+        open={canvaOpen}
+        onClose={() => setCanvaOpen(false)}
+        campaignName={campaign?.name || ""}
+        subjectLine={subjectLine}
+        previewText={previewText}
+        bodyMarkdown={editBody}
+        whatsappCopy={whatsapp}
+        products={editorProducts.length > 0 ? editorProducts : (campaign?.products_data as any[] || [])}
+        heroImageUrl={campaign?.hero_image_url}
       />
     </div>
   );

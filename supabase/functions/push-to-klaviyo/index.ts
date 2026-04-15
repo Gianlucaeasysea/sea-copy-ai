@@ -35,6 +35,9 @@ function renderMarkdownToHtml(md: string, dark = false): string {
     .replace(/^#{3,6} (.+)$/gm, `<h3 style="font-family:Inter,Arial,sans-serif;font-size:17px;font-weight:600;margin:18px 0 6px;color:${fg};line-height:1.3">$1</h3>`)
     .replace(/^[-*] (.+)$/gm, `<li style="margin:6px 0;font-family:Inter,Arial,sans-serif;font-size:15px;color:${bodyColor};line-height:1.7">$1</li>`)
     .replace(/(<li[^>]*>.*<\/li>)/gs, '<ul style="padding-left:20px;margin:14px 0">$1</ul>')
+    // CTA con URL esplicito: → [Testo bottone](https://url.com)
+    .replace(/→ \[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, `<a href="$2" target="_blank" style="display:inline-block;background:${ctaBg};color:#ffffff;padding:12px 28px;border-radius:8px;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin:12px 0;letter-spacing:0.3px">→ $1</a>`)
+    // CTA senza URL (l'utente imposta il link in Klaviyo)
     .replace(/→ (.+)/g, `<a href="#" style="display:inline-block;background:${ctaBg};color:#ffffff;padding:12px 28px;border-radius:8px;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;margin:12px 0;letter-spacing:0.3px">→ $1</a>`)
     .replace(/!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)/g, '<img src="$2" alt="$1" style="display:block;max-width:100%;margin:16px 0;border-radius:8px" />')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, `<a href="$2" style="color:${linkColor};text-decoration:underline">$1</a>`)
@@ -48,7 +51,7 @@ function buildProductCardsHtml(products: Product[]): string {
 
   const cards = products.map((p) => {
     const imgHtml = p.image_url
-      ? `<img src="${p.image_url}" alt="${p.title}" width="100%" style="display:block;width:100%;border-radius:10px 10px 0 0" />`
+      ? `<a href="${p.url}" target="_blank" style="display:block"><img src="${p.image_url}" alt="${p.title}" width="100%" style="display:block;width:100%;border-radius:10px 10px 0 0" /></a>`
       : "";
     const compareHtml = p.compare_at_price
       ? `<span style="font-size:12px;color:#999;text-decoration:line-through;margin-right:6px">${formatPrice(p.compare_at_price)}</span>`
@@ -70,7 +73,6 @@ function buildProductCardsHtml(products: Product[]): string {
     </td>`;
   });
 
-  // Build rows of 2 products each
   let rows = "";
   for (let i = 0; i < cards.length; i += 2) {
     const second = cards[i + 1] || "<td></td>";
@@ -84,7 +86,7 @@ function buildDarkProductCardsHtml(products: Product[]): string {
   if (!products || products.length === 0) return "";
   const cards = products.map((p) => {
     const imgHtml = p.image_url
-      ? `<img src="${p.image_url}" alt="${p.title}" style="display:block;width:100%;border-radius:12px 12px 0 0" />`
+      ? `<a href="${p.url}" target="_blank" style="display:block"><img src="${p.image_url}" alt="${p.title}" style="display:block;width:100%;border-radius:12px 12px 0 0" /></a>`
       : "";
     const compareHtml = p.compare_at_price
       ? `<span style="font-size:12px;color:#666;text-decoration:line-through;margin-right:6px">${formatPrice(p.compare_at_price)}</span>`
@@ -245,11 +247,149 @@ ${productCardsHtml}
 </html>`;
 }
 
+// ── Plain text: minimal HTML, personal feel ──────────────────────────────────
+
+function buildPlainTextHtml(campaign: any, fromName: string): string {
+  const bodyHtml = (campaign.body_markdown || "")
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/~~(.*?)~~/g, "<s>$1</s>")
+    .replace(/^#{1,6} (.+)$/gm, "<h3 style='margin:18px 0 8px;font-size:17px;font-weight:600;color:#1a1a1a'>$1</h3>")
+    .replace(/^[-*] (.+)$/gm, "<li style='margin:6px 0'>$1</li>")
+    .replace(/(<li[^>]*>.*<\/li>)/gs, "<ul style='padding-left:18px;margin:12px 0'>$1</ul>")
+    .replace(/→ \[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, "<a href='$2' style='color:#0A1628;font-weight:600'>$1 →</a>")
+    .replace(/→ (.+)/g, "<a href='#' style='color:#0A1628;font-weight:600'>$1 →</a>")
+    .replace(/!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)/g, '<img src="$2" alt="$1" style="display:block;max-width:100%;margin:16px 0;border-radius:8px" />')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, "<a href='$2' style='color:#0A1628;text-decoration:underline'>$1</a>")
+    .replace(/\n\n/g, "</p><p style='margin:14px 0;line-height:1.75;color:#333;font-size:16px'>")
+    .replace(/^/, "<p style='margin:14px 0;line-height:1.75;color:#333;font-size:16px'>")
+    .replace(/$/, "</p>");
+
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${campaign.subject_line || campaign.name}</title>
+</head>
+<body style="margin:0;padding:0;background:#ffffff">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="padding:40px 20px">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%">
+  <tr><td style="padding-bottom:24px;border-bottom:1px solid #eeeeee;margin-bottom:24px">
+    <p style="font-family:Georgia,serif;font-size:13px;color:#999;margin:0">${fromName}</p>
+  </td></tr>
+  <tr><td style="padding-top:24px;font-family:Georgia,serif">
+    ${bodyHtml}
+  </td></tr>
+  <tr><td style="padding-top:32px;border-top:1px solid #eeeeee;margin-top:32px">
+    <p style="font-family:Georgia,serif;font-size:12px;color:#aaa;margin:0">
+      <a href="{{ unsubscribe_url }}" style="color:#aaa;text-decoration:underline">Disiscriviti</a>
+      &nbsp;·&nbsp; ${fromName}
+    </p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+// ── Template: struttura modulare con sezioni etichettate ──────────────────────
+
+function buildSectionedHtml(campaign: any, fromName: string): string {
+  const bodyHtml = renderMarkdownToHtml(campaign.body_markdown || "", true);
+  const products: Product[] = Array.isArray(campaign.products_data) ? campaign.products_data : [];
+  const productCardsHtml = buildDarkProductCardsHtml(products);
+
+  const heroSection = campaign.hero_image_url
+    ? `<!-- SECTION: HERO_IMAGE [rimuovi se non necessario] -->
+<tr data-section="hero">
+  <td><img src="${campaign.hero_image_url}" alt="Hero" width="600" style="display:block;width:100%;max-height:360px;object-fit:cover" /></td>
+</tr>
+<!-- /SECTION: HERO_IMAGE -->`
+    : "<!-- SECTION: HERO_IMAGE [vuoto — aggiungi immagine o rimuovi] -->\n<!-- /SECTION: HERO_IMAGE -->";
+
+  const productsSection = products.length > 0
+    ? `<!-- SECTION: PRODOTTI [rimuovi se non necessario] -->
+<tr data-section="products">
+  <td style="padding:0 32px 16px">
+    ${productCardsHtml}
+  </td>
+</tr>
+<!-- /SECTION: PRODOTTI -->`
+    : "<!-- SECTION: PRODOTTI [vuoto — aggiungi prodotti o rimuovi] -->\n<!-- /SECTION: PRODOTTI -->";
+
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+<title>${campaign.subject_line || campaign.name}</title>
+<style>
+  body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+  img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none}
+  body{margin:0;padding:0;background-color:#000000}
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#000000">
+<center>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#000">
+<tr><td align="center" style="padding:20px 0">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#0a0a0a;border-radius:16px;overflow:hidden">
+
+<!-- SECTION: HEADER -->
+<tr data-section="header"><td style="padding:20px 32px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td style="color:#fff;font-family:Inter,Arial,sans-serif;font-weight:800;font-size:20px;letter-spacing:-1px">
+      easysea<span style="font-weight:400;font-size:14px;vertical-align:super;color:#999">®</span>
+    </td>
+    <td align="right">
+      <a href="https://www.easysea.org" style="font-family:Inter,Arial,sans-serif;font-size:12px;font-weight:500;color:#4355DB;text-decoration:none">easysea.org →</a>
+    </td>
+  </tr>
+  </table>
+</td></tr>
+<tr><td style="padding:0 32px"><div style="height:2px;background:linear-gradient(90deg,#4355DB,transparent);border-radius:2px"></div></td></tr>
+<!-- /SECTION: HEADER -->
+
+${heroSection}
+
+<!-- SECTION: BODY [contenuto principale] -->
+<tr data-section="body"><td style="padding:28px 32px 16px;font-family:Inter,Arial,sans-serif">
+  ${bodyHtml}
+</td></tr>
+<!-- /SECTION: BODY -->
+
+${productsSection}
+
+<!-- SECTION: FOOTER -->
+<tr data-section="footer"><td style="padding:20px 32px 24px;border-top:1px solid #222;text-align:center">
+  <p style="font-family:Inter,Arial,sans-serif;font-size:11px;color:#555;margin:0;letter-spacing:0.5px">EASYSEA® · Beautiful and innovative nautical accessories</p>
+  <p style="font-family:Inter,Arial,sans-serif;font-size:11px;color:#444;margin:8px 0 0">
+    <a href="{{ unsubscribe_url }}" style="color:#555;text-decoration:underline">Unsubscribe</a>
+    <span style="color:#333;margin:0 8px">·</span>
+    <a href="https://www.easysea.org" style="color:#4355DB;text-decoration:none;font-weight:500">Visit easysea.org</a>
+  </p>
+</td></tr>
+<!-- /SECTION: FOOTER -->
+
+</table>
+</td></tr>
+</table>
+</center>
+</body>
+</html>`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { campaign_id, branded_style } = await req.json();
+    const { campaign_id, branded_style, output_format } = await req.json();
     if (!campaign_id) throw new Error("campaign_id required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -279,10 +419,18 @@ serve(async (req) => {
       revision,
     };
 
-    // 1. Build HTML (branded dark or classic)
-    const brandedHtml = branded_style
-      ? buildDarkBrandedHtml(campaign, fromName)
-      : buildBrandedHtml(campaign, fromName);
+    // Scegli HTML in base al formato richiesto
+    let brandedHtml: string;
+    const fmt = output_format || (branded_style ? "html_dark" : "html_light");
+    if (fmt === "plaintext") {
+      brandedHtml = buildPlainTextHtml(campaign, fromName);
+    } else if (fmt === "template") {
+      brandedHtml = buildSectionedHtml(campaign, fromName);
+    } else if (fmt === "html_dark") {
+      brandedHtml = buildDarkBrandedHtml(campaign, fromName);
+    } else {
+      brandedHtml = buildBrandedHtml(campaign, fromName);
+    }
 
     // 2. Create Klaviyo template
     const templateRes = await fetch("https://a.klaviyo.com/api/templates/", {
@@ -309,6 +457,22 @@ serve(async (req) => {
     const templateData = await templateRes.json();
     const templateId = templateData?.data?.id;
     console.log("Created Klaviyo template:", templateId);
+
+    // Se il formato è "template", salva solo il template e ritorna senza creare campaign
+    if (fmt === "template") {
+      const templateUrl = templateId
+        ? `https://www.klaviyo.com/email-marketing/templates`
+        : null;
+      return new Response(
+        JSON.stringify({
+          success: true,
+          format: "template",
+          klaviyo_template_id: templateId,
+          klaviyo_url: templateUrl,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // 3. Get first Klaviyo list for audiences (user will set the real list in Klaviyo)
     const listsRes = await fetch("https://a.klaviyo.com/api/lists/", { headers });
@@ -391,7 +555,6 @@ serve(async (req) => {
       if (!assignRes.ok) {
         const err = await assignRes.text();
         console.error("Klaviyo assign template error:", assignRes.status, err);
-        // Non-fatal — campaign still created
       } else {
         console.log("Template assigned to campaign message");
       }
