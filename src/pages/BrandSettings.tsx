@@ -283,6 +283,27 @@ export default function BrandSettings() {
         </CardContent>
       </Card>
 
+      {/* Canva */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Canva</CardTitle>
+          <CardDescription>
+            API key per creare design direttamente in Canva. Ottienila su canva.com/developers (serve piano Teams/Enterprise).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label>Canva API Key</Label>
+            <Input
+              type="password"
+              value={settings.canva_api_key || ""}
+              onChange={(e) => update("canva_api_key", e.target.value)}
+              placeholder="cnapi_..."
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Shopify */}
       <Card>
         <CardHeader>

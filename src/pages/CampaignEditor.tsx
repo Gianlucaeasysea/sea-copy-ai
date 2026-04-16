@@ -344,31 +344,9 @@ export default function CampaignEditor() {
   const handlePushToKlaviyo = async () => {
     if (!campaign) return;
 
-    // Canva — push via API
+    // Canva — open brief modal
     if (outputFormat === "canva") {
-      setPushingCanva(true);
-      try {
-        const { data, error } = await supabase.functions.invoke("push-to-canva", {
-          body: {
-            campaign_id: campaign.id,
-            subject_line: subjectLine,
-            body_markdown: editBody,
-            products: editorProducts,
-            hero_image_url: campaign.hero_image_url,
-          },
-        });
-        if (error) throw error;
-        if (data?.edit_url) {
-          window.open(data.edit_url, "_blank");
-          toast.success("Design creato in Canva!");
-        } else {
-          toast.success("Design inviato a Canva");
-        }
-      } catch (e: any) {
-        toast.error("Canva push fallito: " + (e?.message || "errore"));
-      } finally {
-        setPushingCanva(false);
-      }
+      setCanvaOpen(true);
       return;
     }
 
